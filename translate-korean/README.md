@@ -74,6 +74,11 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
   - Some translations were correct (e.g., 십이→twelve, 팔→eight)
   - Sample output: 삼 thire, 십이 twelve, y, 십이 two, 오 sive, 십구 nineteen, 팔 eight, 십육 sighteeen, 십육 sixteen, 육 sixt, 십삼 thirteeen, 팔
 
+### Output:
+   <img width="361" height="454" alt="image" src="https://github.com/user-attachments/assets/df9cc943-8893-4fbd-a031-741c466a2558" />
+
+
+
 ### Run 2: Main (max_iters=2000)
 - **Purpose**: Actual training with more iterations
 - **Config**: max_iters=2000, device=cpu (GPU attempted but encountered dt=0 error, reverted to CPU), compile=False
@@ -82,6 +87,10 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
   - Sample output: 오 five, 십일 eleven, 팔 eight, 사 four, 이십 twenty, 이 two, 십삼 thirteen, 삼 three, 십팔 eighteen, 십이 twelve, 십육 sixteen
   - Significant improvement from Run 1 - no typos observed
   - Model successfully learned the Korean-to-English number translation pattern
+
+### Output:
+   <img width="120" height="443" alt="image" src="https://github.com/user-attachments/assets/af5bf094-72f3-4efd-a24e-5698505eb2ca" />
+
 
 ### Conclusion
 - **What worked**: 
