@@ -1,10 +1,11 @@
-# comp560-JohnLee
+s# comp560-JohnLee
 
 This repo contains GyuJin Lee's experiments for the COMP560 research project.
 
 ## Experiments
 
 - `translate-korean/`: Character-level language model learning Korean number translations (일 one, 이 two, etc.)
+- `wandb_tutorial/`: followed tutorial that wandb provided
 
 ## Setup
 
