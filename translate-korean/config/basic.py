@@ -10,9 +10,9 @@ log_interval = 1
 # we expect to overfit on this small dataset, so only save when val improves
 always_save_checkpoint = False
 
-wandb_log = False # override via command line if you like
-wandb_project = 'translate-korean-basic'
-wandb_run_name = 'infant'
+wandb_log = True # override via command line if you like
+wandb_project = 'translate-korean-to-english-numbers'
+wandb_run_name = 'translate-korean-v1-2000-iters'
 
 dataset = 'basic'
 gradient_accumulation_steps = 1
