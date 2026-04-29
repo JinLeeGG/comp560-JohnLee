@@ -1,5 +1,6 @@
- Generalization Experiment: Copy Task
-**Date:** April 29, 2025  
+
+# Generalization Experiment: Copy Task
+**Date:** April 29, 2026
 **Experiment #1**
 
 This experiment trains a character-level GPT model on a lowercase-only copy task, then tests whether it can transfer that knowledge to uppercase letters through fine-tuning.
@@ -8,14 +9,17 @@ This experiment trains a character-level GPT model on a lowercase-only copy task
 
 ## Data Format
 The model learns from a stream of copy pairs:
+```
 abc:abc
 hello:hello
 zrpmj:zrpmj
+```
 Only lowercase a-z is used in Phase 1. Vocab size: 28 (a-z, colon, newline).
 
 ---
 
 ## Directory Structure
+```
 generalization-copy/
 ├── README.md
 ├── config/
@@ -27,6 +31,7 @@ generalization-copy/
 │       ├── train.bin
 │       └── val.bin
 └── out/
+```
 
 ---
 
@@ -69,8 +74,8 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 ## Experiment Log
 
 ### Run 1: max_iters=2000
-**Purpose:** Verify workflow and train baseline lowercase copy model  
-**Config:** max_iters=2000, n_layer=4, n_head=4, n_embd=128, block_size=32, device=cpu, compile=False  
+**Purpose:** Verify workflow and train baseline lowercase copy model
+**Config:** max_iters=2000, n_layer=4, n_head=4, n_embd=128, block_size=32, device=cpu, compile=False
 **Results:**
 - Training completed successfully, final val loss: 1.7350
 - Model partially learned the copy task
