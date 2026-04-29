@@ -20,6 +20,7 @@ max_iters = 2000
 lr_decay_iters = 2000
 learning_rate = 1e-3
 min_lr = 1e-4
+warmup_iters = 100
 
 device = 'cpu'
 compile = False
