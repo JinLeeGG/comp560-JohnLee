@@ -1,3 +1,4 @@
+
 # Generalization Experiment: Copy Task
 **Date:** April 29, 2026
 **Experiment #1**
@@ -77,6 +78,11 @@ Automated accuracy measurement on random test inputs:
 NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u evaluate.py config/basic.py
 ```
 
+To test on uppercase inputs:
+```bash
+NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u evaluate.py config/basic.py --test_alphabet=uppercase
+```
+
 ---
 
 ## Experiment Log
@@ -116,16 +122,23 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u evaluate.py confi
 
 ---
 
-### Run 4: vocab size update (in progress)
+### Run 4: vocab size update with uppercase tokens
 **Purpose:** Add uppercase letters to vocab so the model has those tokens available for Phase 2 and 3, without changing training data
 **Changes:**
 - Updated prepare.py so vocab includes a-z, A-Z, colon, and newline (vocab size: 54)
 - Training data still uses only lowercase
-- Need to retrain because vocab size changed
+- Retrained the model with the new vocab
+
+**Results:**
+- **Lowercase copy accuracy: 100% (100/100 correct)**
+- **Uppercase copy accuracy: 0% (0/100 correct)**
+- This is exactly the baseline expected before any fine-tuning
+- Looking at errors, the model outputs lowercase-like patterns (e.g., "ywz", "GGGGGG") when given uppercase inputs, suggesting it falls back on what it knows
 
 ---
 
 ## Next Steps
-- Retrain with updated vocab and confirm lowercase accuracy stays around 98%
-- Run evaluate.py with uppercase test inputs to measure baseline (expected: very low)
-- Fine-tune with small amount of uppercase data and compare to a model trained from scratch
+- Write a new prepare.py to generate a small uppercase fine-tuning dataset
+- Set up fine-tuning config with init_from pointing to the lowercase checkpoint
+- Run both the fine-tuning experiment and a from-scratch control experiment
+- Compare learning speed to measure knowledge transfer
