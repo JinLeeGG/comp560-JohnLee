@@ -1,5 +1,5 @@
- Generalization Experiment: Copy Task
-**Date:** April 29, 2025  
+# Generalization Experiment: Copy Task
+**Date:** April 29, 2026
 **Experiment #1**
 
 This experiment trains a character-level GPT model on a lowercase-only copy task, then tests whether it can transfer that knowledge to uppercase letters through fine-tuning.
@@ -8,16 +8,20 @@ This experiment trains a character-level GPT model on a lowercase-only copy task
 
 ## Data Format
 The model learns from a stream of copy pairs:
+```
 abc:abc
 hello:hello
 zrpmj:zrpmj
-Only lowercase a-z is used in Phase 1. Vocab size: 28 (a-z, colon, newline).
+```
+Training data uses only lowercase a-z, but the vocab includes both lowercase and uppercase letters (vocab size: 54) so the model has the uppercase tokens available for Phase 2 and 3.
 
 ---
 
 ## Directory Structure
+```
 generalization-copy/
 ├── README.md
+├── evaluate.py
 ├── config/
 │   └── basic.py
 ├── data/
@@ -27,6 +31,7 @@ generalization-copy/
 │       ├── train.bin
 │       └── val.bin
 └── out/
+```
 
 ---
 
@@ -66,11 +71,19 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 
 ---
 
+## Evaluation
+Automated accuracy measurement on random test inputs:
+```bash
+NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u evaluate.py config/basic.py
+```
+
+---
+
 ## Experiment Log
 
-### Run 1: max_iters=2000
-**Purpose:** Verify workflow and train baseline lowercase copy model  
-**Config:** max_iters=2000, n_layer=4, n_head=4, n_embd=128, block_size=32, device=cpu, compile=False  
+### Run 1: max_iters=2000, block_size=32
+**Purpose:** Verify workflow and train baseline lowercase copy model
+**Config:** max_iters=2000, n_layer=4, n_head=4, n_embd=128, block_size=32, device=cpu, compile=False
 **Results:**
 - Training completed successfully, final val loss: 1.7350
 - Model partially learned the copy task
@@ -84,7 +97,35 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 
 ---
 
+### Run 2: max_iters=5000, block_size=32
+**Purpose:** See if more iterations help
+**Config:** max_iters=5000, block_size=32, others same as Run 1
+**Results:**
+- Train loss kept dropping to 1.34, but val loss rose to 2.30
+- Clear overfitting, sampling actually got worse than Run 1
+
+---
+
+### Run 3: max_iters=5000, block_size=64
+**Purpose:** Test if larger context window fixes the truncation problem
+**Config:** max_iters=5000, block_size=64, others same as Run 1
+**Results:**
+- Sampling looked clean, strings copied correctly
+- Wrote evaluate.py to measure accuracy systematically
+- **Lowercase copy accuracy: 98% (98/100 correct)**
+
+---
+
+### Run 4: vocab size update (in progress)
+**Purpose:** Add uppercase letters to vocab so the model has those tokens available for Phase 2 and 3, without changing training data
+**Changes:**
+- Updated prepare.py so vocab includes a-z, A-Z, colon, and newline (vocab size: 54)
+- Training data still uses only lowercase
+- Need to retrain because vocab size changed
+
+---
+
 ## Next Steps
-- Increase `max_iters` to 5000 and retrain until loss drops below 0.1
-- Once lowercase copy is reliable, test on uppercase-only inputs to measure baseline accuracy
-- Fine-tune with small amount of uppercase data and compare learning speed to a model trained from scratch
+- Retrain with updated vocab and confirm lowercase accuracy stays around 98%
+- Run evaluate.py with uppercase test inputs to measure baseline (expected: very low)
+- Fine-tune with small amount of uppercase data and compare to a model trained from scratch

@@ -12,7 +12,7 @@ data_dir = 'data/basic'
 n_layer = 4
 n_head = 4
 n_embd = 128
-block_size = 32
+block_size = 64
 dropout = 0.0
 
 batch_size = 64
