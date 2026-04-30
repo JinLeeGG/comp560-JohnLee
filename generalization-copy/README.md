@@ -106,9 +106,9 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u evaluate.py confi
 
 ---
 
-### Run 3: max_iters=5000, block_size=64
+### Run 3: max_iters=2000, block_size=64
 **Purpose:** Test if larger context window fixes the truncation problem
-**Config:** max_iters=5000, block_size=64, others same as Run 1
+**Config:** max_iters=2000, block_size=64, others same as Run 1
 **Results:**
 - Sampling looked clean, strings copied correctly
 - Wrote evaluate.py to measure accuracy systematically
