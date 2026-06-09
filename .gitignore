@@ -12,3 +12,5 @@ meta.pkl
 out/
 .vscode/
 wandb/
+CLAUDE.md
+test.txt
