@@ -27,6 +27,8 @@ held-out-position split.
 **Output:**
 
 <!-- paste screenshot of evaluate.py output here -->
+<img width="444" height="125" alt="image" src="https://github.com/user-attachments/assets/3628e4a8-7a78-4630-9494-c5011c537c88" />
+
 
 ---
 
