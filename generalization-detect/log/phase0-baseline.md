@@ -11,6 +11,17 @@ holding any position out.
 **Config:** 0.79M-param model (`n_layer=4, n_head=4, n_embd=128, block_size=64`), CPU,
 `max_iters=2000`. Data: 50k / 5k / 2k train / val / test, balanced Y/N, length 20, seed 1337.
 
+**Example data** (from the run — X may appear at any of the 20 positions, in both train and test):
+```
+TRAIN (X anywhere, 0–19):
+  6906549923X674605480:Y     ← X at position 10
+  005X5926483998683163:Y     ← X at position 3
+  13209659612789771407:N     ← no X
+TEST (same distribution — X anywhere):
+  8906078089431X282016:Y     ← X at position 13
+  36630763653087640211:N     ← no X
+```
+
 **Results:**
 - Y (X present): **100%** (1000/1000)
 - N (X absent): **100%** (1000/1000)

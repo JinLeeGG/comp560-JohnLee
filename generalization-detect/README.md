@@ -99,7 +99,8 @@ experiment does** (the phase number is kept as a tag for roadmap tracking):
 | Phase | Experiment | Status |
 |-------|------------|--------|
 | 0 | [Detection baseline — X at all positions](log/phase0-baseline.md) | ✅ 100% |
-| 1 | Held-out position 12 _(next)_ | — |
+| 1 | [Held-out positions — detection is position-invariant](log/phase1-heldout-positions.md) | ✅ 100% (trivial) |
+| 2 | Relative order — position-dependent task _(next)_ | — |
 
 This README stays a stable overview; each new phase adds a `log/phaseN-<name>.md`.
 
