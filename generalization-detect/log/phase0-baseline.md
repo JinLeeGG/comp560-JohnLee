@@ -8,8 +8,10 @@
 **Purpose:** Verify the pipeline works end-to-end and hits a high baseline, before
 holding any position out.
 
-**Config:** 0.79M-param model (`n_layer=4, n_head=4, n_embd=128, block_size=64`), CPU,
-`max_iters=2000`. Data: 50k / 5k / 2k train / val / test, balanced Y/N, length 20, seed 1337.
+**Config:**
+- **Model:** 0.79M params — `n_layer=4, n_head=4, n_embd=128, block_size=64`
+- **Training:** `max_iters=2000`, CPU
+- **Data:** 50k / 5k / 2k (train / val / test) · balanced Y/N · length 20 · seed 1337
 
 **Example data** (from the run — X may appear at any of the 20 positions, in both train and test):
 ```
@@ -27,8 +29,15 @@ TEST (same distribution — X anywhere):
 - N (X absent): **100%** (1000/1000)
 - Overall: **100%** (2000/2000) — baseline met.
 
-**Output:**
+**Output (screenshots):**
 
+**1. Data prep** (`prepare.py` — confirms the split)
+<!-- paste prepare.py screenshot here -->
+
+**2. Training** (`train.py`)
+<!-- paste train.py screenshot here -->
+
+**3. Evaluation — result** (`evaluate.py`)
 <img width="444" height="125" alt="evaluate.py output" src="https://github.com/user-attachments/assets/3628e4a8-7a78-4630-9494-c5011c537c88" />
 
 ---

@@ -8,8 +8,10 @@
 **Purpose:** First generalization test. Train with X in every position except 12, then
 test whether the model detects X at position 12 — a position it never saw during training.
 
-**Config:** same model as Phase 0 (0.79M params, 2000 iters, CPU). Train/val X in
-positions 0–11 and 13–19; test X only at position 12. Test set: 1,000 Y / 1,000 N.
+**Config:**
+- **Model:** same as Phase 0 (0.79M params, 2000 iters, CPU)
+- **Split:** train/val X in positions 0–11 & 13–19 · test X only at position 12
+- **Test set:** 1,000 Y / 1,000 N
 
 **Example data** (illustrating the split — X position annotated):
 ```
@@ -25,9 +27,16 @@ TEST  (X only at position 12):
 - Y (X present, all at position 12): **100%** (1000/1000)
 - N (X absent): **100%** (1000/1000)
 
-**Output:**
+**Output (screenshots):**
 
-<!-- paste evaluate.py screenshot (SPLIT=single) here -->
+**1. Data prep** (`prepare.py` — confirms test X-positions = [12])
+<!-- paste prepare.py screenshot here -->
+
+**2. Training** (`train.py`)
+<!-- paste train.py screenshot here -->
+
+**3. Evaluation — result** (`evaluate.py`)
+<!-- paste evaluate.py screenshot here -->
 
 ---
 
@@ -37,7 +46,9 @@ TEST  (X only at position 12):
 Run 1 only needed easy "interpolation." Here the model never sees X anywhere in positions
 10–19, so it must extrapolate to an entire unseen region.
 
-**Config:** same model. Train/val X in positions 0–9 only; test X in positions 10–19.
+**Config:**
+- **Model:** same as Phase 0
+- **Split:** train/val X in positions 0–9 only · test X in positions 10–19
 
 **Example data** (from the actual run — note X is in the left half for train, right half for test):
 ```
@@ -54,9 +65,16 @@ TEST  (X only in 10–19):
 - Y (X present, all in positions 10–19): **100%** (1000/1000)
 - N (X absent): **100%** (1000/1000)
 
-**Output:**
+**Output (screenshots):**
 
-<!-- paste evaluate.py screenshot (SPLIT=half) here -->
+**1. Data prep** (`prepare.py` — confirms test X-positions = [10–19])
+<!-- paste prepare.py screenshot here -->
+
+**2. Training** (`train.py`)
+<!-- paste train.py screenshot here -->
+
+**3. Evaluation — result** (`evaluate.py`)
+<!-- paste evaluate.py screenshot here -->
 
 ---
 
