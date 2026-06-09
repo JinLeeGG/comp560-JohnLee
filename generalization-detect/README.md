@@ -1,6 +1,5 @@
 # Generalization Experiment: Detection Task
 **Date:** June 8, 2026
-**Experiment #2** (Phase 0 — reorient infrastructure)
 
 This experiment trains a micro-transformer (<1M params) on a **symbol-detection**
 task and measures whether it generalizes to symbol *positions* it never saw during
