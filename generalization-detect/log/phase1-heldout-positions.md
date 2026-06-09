@@ -80,22 +80,23 @@ TEST  (X only in 10–19):
 
 ## Conclusion
 
-The model generalizes to held-out positions perfectly — even with an entire half of the
-positions unseen. But this is **not** deep position generalization. **Detection is
-position-invariant:** "is X present?" does not depend on *where* X is, so the model learns
-a single position-general X-presence detector instead of per-position detectors, and any
-held-out position transfers for free.
+The model scored 100% even on positions it never trained on — at first glance, perfect
+generalization. But the reason is almost a trick: **to answer "is there an X?", you don't
+need to know *where* the X is.** Detection is **position-invariant** (the answer doesn't
+depend on the X's location), so the model just learns to spot the X token *anywhere*, and a
+position it never trained on works automatically. The held-out split never really
+challenged it.
 
-This is still useful: it pins down the **"trivially generalizes" end** of the spectrum. To
-see *when* generalization fails, the next task's answer must **depend on position**.
+So detection sits at the **easy end**: it always generalizes, because position doesn't
+matter to the answer. To find out *when* generalization actually **fails**, we need a task
+whose answer **depends on position** — that's the next step (relative order: is X before Y?).
 
-**Caveats:**
-- This isn't a data artifact — even with perfectly aligned examples it would still be
-  ~100%, because the model keys on the X token's *presence*, not its location. But the
-  flat-stream misalignment (Phase 0 open item) does make "held out" less clean and must be
-  fixed for position-dependent tasks.
-- No seed sweep here: the result is 100% with an understood cause, so there's no variance
-  to measure. Seed sweeps matter once a task sits near a generalization boundary.
+**Two objections this rules out:**
+- *Not a data-alignment artifact.* Even with the flat-stream misalignment (Phase 0 open
+  item) fixed, this would still be ~100%, because the model only cares whether X appears,
+  not where. (We still fix alignment before the position-dependent task.)
+- *No seed sweep needed.* A clean 100% with a known cause — more seeds would just repeat
+  it. Seed sweeps matter when results are noisy or near a generalization boundary.
 
 ## Next
 

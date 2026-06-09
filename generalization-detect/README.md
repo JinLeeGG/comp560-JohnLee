@@ -53,6 +53,7 @@ Classes are kept balanced 50/50 (Y/N), so chance accuracy is 50%.
 generalization-detect/
 ├── README.md
 ├── evaluate.py
+├── verify_eval.py          (correctness / sanity check)
 ├── config/
 │   └── basic.py
 ├── data/
@@ -62,6 +63,7 @@ generalization-detect/
 │       ├── train.bin       (generated)
 │       ├── val.bin         (generated)
 │       └── test.txt        (generated)
+├── log/                    (per-phase experiment logs)
 └── out/                    (checkpoint)
 ```
 
@@ -89,6 +91,19 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u evaluate.py config/basic.py
 ```
 
+## Verify (sanity check)
+`verify_eval.py` checks that the headline accuracy is real, independent of `test.txt`:
+1. **Causal probes** — takes a fixed digit string and flips `X` in/out at chosen
+   positions, confirming the model's answer flips `N`↔`Y` (including at *held-out*
+   positions). This proves the model genuinely detects `X`, not that it memorized labels.
+2. **Label integrity** — every `test.txt` line is length 20 and `(X present) iff (label Y)`.
+3. **Position coverage** — reports where `X` actually lands in the test set.
+
+Run it after any change to the data or model:
+```bash
+python verify_eval.py
+```
+
 ---
 
 ## Experiment Logs
@@ -107,6 +122,7 @@ This README stays a stable overview; each new phase adds a `log/phaseN-<name>.md
 ---
 
 ## Next Steps
-- **Phase 1:** set `SPLIT='single'` (hold out position 12), re-run prepare → train →
-  evaluate, and measure whether held-out-position accuracy drops. First real result.
-- Run 3–5 seeds per config and report mean/variance.
+- **Phase 2 — relative order:** one `X` and one `Y`; output `Y` if `X` comes before `Y`.
+  The answer depends on position, so held-out positions can genuinely break generalization
+  (unlike detection, which is position-invariant). Build it with **aligned examples**.
+- Add a seed sweep (3–5 seeds, mean/variance) once a task sits near a generalization boundary.
