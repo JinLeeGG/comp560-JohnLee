@@ -31,12 +31,18 @@ TEST  (X only at position 12):
 
 **1. Data prep** (`prepare.py` — confirms test X-positions = [12])
 <!-- paste prepare.py screenshot here -->
+<img width="559" height="366" alt="image" src="https://github.com/user-attachments/assets/0c752b66-c8de-40fd-893e-a36be0085007" />
+
 
 **2. Training** (`train.py`)
 <!-- paste train.py screenshot here -->
+<img width="358" height="536" alt="image" src="https://github.com/user-attachments/assets/a48e6d6d-4e1e-4950-a266-b9600cba8916" />
+
 
 **3. Evaluation — result** (`evaluate.py`)
 <!-- paste evaluate.py screenshot here -->
+<img width="276" height="89" alt="image" src="https://github.com/user-attachments/assets/77c5a101-1c8f-4ea2-a6e6-725e2e0761cb" />
+
 
 ---
 
@@ -69,12 +75,18 @@ TEST  (X only in 10–19):
 
 **1. Data prep** (`prepare.py` — confirms test X-positions = [10–19])
 <!-- paste prepare.py screenshot here -->
+<img width="559" height="349" alt="image" src="https://github.com/user-attachments/assets/aa797db7-bffa-4409-8cdd-f62d6b043fd1" />
+
 
 **2. Training** (`train.py`)
 <!-- paste train.py screenshot here -->
+<img width="386" height="538" alt="image" src="https://github.com/user-attachments/assets/8d8d5d9e-9469-488e-9617-a1553834ebec" />
+
 
 **3. Evaluation — result** (`evaluate.py`)
 <!-- paste evaluate.py screenshot here -->
+<img width="288" height="89" alt="image" src="https://github.com/user-attachments/assets/3d8ec581-0240-4fdc-8974-44f8aec811cb" />
+
 
 ---
 
