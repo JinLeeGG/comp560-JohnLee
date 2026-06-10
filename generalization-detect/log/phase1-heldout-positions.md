@@ -107,8 +107,9 @@ whose answer **depends on position** — that's the next step (relative order: i
 - *Not a data-alignment artifact.* Even with the flat-stream misalignment (Phase 0 open
   item) fixed, this would still be ~100%, because the model only cares whether X appears,
   not where. (We still fix alignment before the position-dependent task.)
-- *No seed sweep needed.* A clean 100% with a known cause — more seeds would just repeat
-  it. Seed sweeps matter when results are noisy or near a generalization boundary.
+- *No seed sweep here.* A saturated 100% with a known cause won't change across seeds —
+  seed sweeps earn their keep when results are noisy or sit near a generalization
+  boundary, which is exactly what Task 2 should produce. I'll run multiple seeds there.
 
 ## Next
 
