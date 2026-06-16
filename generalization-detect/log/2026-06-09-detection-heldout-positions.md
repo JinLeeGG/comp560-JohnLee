@@ -1,5 +1,5 @@
 # Held-Out Positions — detection is position-invariant
-*Phase 1 · June 9, 2026 · result: generalizes 100%, but for a trivial reason*
+*2026-06-09 · result: generalizes 100%, but for a trivial reason · roadmap: Phase 1*
 
 ---
 

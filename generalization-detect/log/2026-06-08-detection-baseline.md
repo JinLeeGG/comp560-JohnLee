@@ -1,5 +1,5 @@
 # Detection Baseline — X at all positions
-*Phase 0 · June 8, 2026 · ✅ 100%*
+*2026-06-08 · ✅ 100% · roadmap: Phase 0*
 
 ---
 

@@ -31,7 +31,7 @@ LENGTH = 20            # fixed input length (number of digit slots before ':')
 #   'single'   : hold out one position (HELDOUT_SINGLE)
 #   'even_odd' : train on even positions, test on odd positions
 #   'half'     : train on first half, test on second half
-SPLIT = 'single'
+SPLIT = 'single'       # 'single' = hold out HELDOUT_SINGLE for the generalization test
 HELDOUT_SINGLE = 12    # only used when SPLIT == 'single'
 
 N_TRAIN = 50_000       # number of training examples

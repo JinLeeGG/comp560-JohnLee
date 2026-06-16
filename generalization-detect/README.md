@@ -108,16 +108,17 @@ python verify_eval.py
 
 ## Experiment Logs
 
-Detailed records live in [`log/`](log/) — one file per phase, titled by **what the
-experiment does** (the phase number is kept as a tag for roadmap tracking):
+Detailed records live in [`log/`](log/) — one file per experiment, named
+`YYYY-MM-DD-<task>.md` (dated so they sort chronologically as the roadmap shifts):
 
-| Phase | Experiment | Status |
-|-------|------------|--------|
-| 0 | [Detection baseline — X at all positions](log/phase0-baseline.md) | ✅ 100% |
-| 1 | [Held-out positions — detection is position-invariant](log/phase1-heldout-positions.md) | ✅ 100% (trivial) |
-| 2 | Relative order — position-dependent task _(next)_ | — |
+| Date | Experiment | Status |
+|------|------------|--------|
+| 2026-06-08 | [Detection baseline — X at all positions](log/2026-06-08-detection-baseline.md) | ✅ 100% |
+| 2026-06-09 | [Held-out positions — detection is position-invariant](log/2026-06-09-detection-heldout-positions.md) | ✅ 100% (trivial) |
+| 2026-06-16 | [From-scratch engine — swappable positional encoding](log/2026-06-16-from-scratch-pe-engine.md) | ✅ gate passed (learned) |
+| _next_ | Relative order — position-dependent task | — |
 
-This README stays a stable overview; each new phase adds a `log/phaseN-<name>.md`.
+This README stays a stable overview; each new experiment adds a `log/YYYY-MM-DD-<task>.md`.
 
 ---
 

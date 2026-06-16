@@ -14,13 +14,11 @@ Run from generalization-detect/:
     ../venv/bin/python verify_eval.py
 """
 import os
-import sys
 import pickle
 from collections import Counter
 import torch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'comp560-nanoGPT'))
-from model import GPTConfig, GPT
+from model import MicroTransformer, MicroTransformerConfig
 
 out_dir = 'out'
 data_dir = 'data/detect'
@@ -34,12 +32,8 @@ decode = lambda ids: ''.join(itos[i] for i in ids)
 
 # load model exactly like evaluate.py does
 ckpt = torch.load(os.path.join(out_dir, 'ckpt.pt'), map_location=device, weights_only=False)
-model = GPT(GPTConfig(**ckpt['model_args']))
-sd = ckpt['model']
-for k in list(sd.keys()):
-    if k.startswith('_orig_mod.'):
-        sd[k[len('_orig_mod.'):]] = sd.pop(k)
-model.load_state_dict(sd)
+model = MicroTransformer(MicroTransformerConfig(**ckpt['model_args']))
+model.load_state_dict(ckpt['model'])
 model.eval()
 
 
@@ -47,8 +41,8 @@ def predict(body):
     """body = 20-char string; return the model's single token after ':'."""
     ids = torch.tensor([encode(body + ':')], dtype=torch.long)
     with torch.no_grad():
-        out = model.generate(ids, max_new_tokens=1, temperature=0.1, top_k=1)
-    return decode([out[0, -1].item()])
+        logits = model(ids)
+    return decode([logits[0, -1].argmax().item()])
 
 
 print("=== 1. Controlled causal probes (flip X presence) ===")
