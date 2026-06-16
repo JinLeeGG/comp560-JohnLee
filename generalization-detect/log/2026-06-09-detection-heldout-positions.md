@@ -99,6 +99,14 @@ depend on the X's location), so the model just learns to spot the X token *anywh
 position it never trained on works automatically. The held-out split never really
 challenged it.
 
+**A PE *was* active here.** These runs used nanoGPT's default **learned absolute PE**
+(`wpe = nn.Embedding(block_size, n_embd)`, added to the token embeddings), so the 100% is
+*despite* a positional encoding being present — not because there was none. A
+position-invariant task simply makes whatever PE is present irrelevant to the answer.
+(Confirmed 2026-06-16 on the from-scratch engine: re-running with `pos_type='none'` — no
+positional encoding at all — also scores 100% / 100%, including at held-out position 12.
+Removing the PE changes nothing here, because the task never needed it.)
+
 So detection sits at the **easy end**: it always generalizes, because position doesn't
 matter to the answer. To find out *when* generalization actually **fails**, we need a task
 whose answer **depends on position** — that's the next step (relative order: is X before Y?).
