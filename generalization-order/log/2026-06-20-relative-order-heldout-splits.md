@@ -1,148 +1,142 @@
-# Relative-Order Task — held-out position splits (the phenomenon appears)
+# Relative-Order Task — held-out positions (the phenomenon)
 
-*2026-06-20 · single_pos: both 100% (trivial) · half: **NoPE generalizes (~100%), learned APE fails (~58%, chance)** · roadmap: Phase 2 → Phase 3 PE sweep*
+*2026-06-20 · Phase 2 → motivates the Phase 3 PE sweep*
 
----
+> **Bottom line.** Tested at symbol positions **never seen in training**, `none` (no positional
+> encoding) still scores **~100%**, while `learned` (absolute PE) **collapses to ~58%** — barely
+> above chance — even though *both* hit 100% on in-distribution validation.
+> **Removing positional encoding *helps* generalization here**, the opposite of the naive guess.
 
-This log records the first held-out-position generalization result for relative order.
-The full-distribution baseline had both `none` and `learned` at 100% (the causal mask
-gives a decoder order for free). The question here: does that hold when X and Y land at
-positions never seen in training? Two splits, generalizing detection's hold-out to two
-symbols:
+### The task (one line)
 
-- **`single_pos` (P=12):** train/val never put X or Y at 12; test always has exactly one
-  of them at 12.
-- **`half`:** train/val keep both symbols in the first half (0..9); test puts both in the
-  second half (10..19) — never seen in training.
+Length-20 string with **one `X`** and **one `Y`** (rest are random digits). Output the last token:
 
-Built in `data/order/prepare.py` via a `SPLIT` knob. Engine, config, and answer-token-only
-loss unchanged from the baseline.
-
-## Data integrity (both splits)
-
-`prepare.py` asserts, before writing bins: 50/50 T/F per pool; the label mapping
-(`index(X)<index(Y)` iff T) on every example; and the **split rule itself** (single_pos:
-no train/val symbol at P, exactly one test symbol at P; half: train/val both in 0..9, test
-both in 10..19). All assertions passed for every pool of both splits.
-
----
-
-## Run 1: `single_pos`, P=12 — hold out one position
-
-**Purpose:** Direct parallel to detection's position-12 hold-out: "detection generalized
-to a held-out position — does relative order?"
-
-**Config:** `n_layer=4 n_head=4 n_embd=128` (~0.8M), CPU, 2000 iters, seed 1337; train/val
-with no symbol at 12, test with one symbol at 12, 50/50 T/F.
-
-**Results — both solve it (in-distribution val AND held-out test):**
-
-| pos_type | val acc | test T | test F | test overall |
-|----------|---------|--------|--------|--------------|
-| `none`    | 100% | 100% | 100% | **100%** |
-| `learned` | 100% | 100% | 100% | **100%** |
-
-A single held-out position is too easy — the implicit ordering generalizes to it. Same
-verdict as detection. So we push to the stronger split. (Saturated at 100% → no seed sweep
-needed here.)
-
----
-
-## Run 2: `half` — train first half, test second half (THE result)
-
-**Purpose:** The hard split. The model sees special symbols only in positions 0..9 during
-training; the test puts both symbols in 10..19. Does relative order still generalize, and
-do the PE methods diverge?
-
-**Config:** as above; train/val both symbols in 0..9, test both in 10..19, 50/50 T/F.
-Each half has 10 positions = 90 ordered (X,Y) pairs, plenty to learn the task in-distribution.
-Because this config is **not saturated**, ran a 3–4 seed sweep (seeds 1337–1340; data fixed,
-only model init / batch order vary).
-
-**Results — the methods diverge sharply:**
-
-| pos_type | val acc | held-out test (per seed) | test mean |
-|----------|---------|--------------------------|-----------|
-| `none`    | 100% (all) | 100%, 99.90%, 100% (s1337–1339) | **≈99.97%** |
-| `learned` | 100% (all) | 69%, 50%, 61.5%, 51.25% (s1337–1340) | **≈57.9%** |
-
-Every run reaches **100% in-distribution val** — both methods *learn the task*. But on the
-held-out second half:
-- **`none` (NoPE) generalizes ~perfectly** (~100% every seed).
-- **`learned` (absolute PE) fails** — near chance, and it **collapses to (mostly) one
-  label**: the per-class split is lopsided (e.g. seed 1337 T=38%/F=100%; seed 1338 flips to
-  T=100%/F=0%). Which class it defaults to varies by seed; that it collapses does not.
-
-This is "**learned the task but didn't generalize**" — the interesting case — for `learned`,
-and full generalization for `none`.
-
-**Output (representative, seed 1337):**
 ```
-none    | val 100% | test:  T 1000/1000=100%  F 1000/1000=100%  OVERALL 100%
-learned | val 100% | test:  T  380/1000= 38%  F 1000/1000=100%  OVERALL  69%
-  errors all gold=T pred=F, X/Y both in 2nd half:  X@14 Y@15, X@10 Y@18, X@11 Y@19, ...
+T  if  X is before Y        ...X...Y...  : T
+F  if  Y is before X        ...Y...X...  : F      rule (fixed): T ⇔ index(X) < index(Y)
 ```
+
+The two settings we compare (only this changes between runs):
+**`none` = NoPE** (no positional encoding) · **`learned` = APE** (learned absolute position embedding).
+
+### What "held out" means here
+
+On the full distribution (previous log) both settings scored 100%, so we now restrict **where**
+`X`/`Y` may appear and test on positions the model never trained on:
+
+| split | train / val sees | test = held out (never trained) |
+|-------|------------------|---------------------------------|
+| `single_pos` (P=12) | `X`,`Y` never at position 12 | exactly one of `X`/`Y` at position 12 |
+| `half` | both `X`,`Y` in the **first** half (0–9) | both `X`,`Y` in the **second** half (10–19) |
+
+Every pool is 50/50 T/F (chance = 50%). `prepare.py` asserts both the label rule and the split
+rule on every example before writing data — all passed.
+
+---
+
+## Results at a glance
+
+Both settings behave **identically** until the hard split, where `learned` breaks:
+
+| split | `none` held-out | `learned` held-out |
+|-------|-----------------|--------------------|
+| full distribution (baseline) | 100% | 100% |
+| `single_pos` (hold out 1 position) | 100% | 100% |
+| **`half` (hold out 2nd half)** | **≈100%** | **≈58%** ← breaks |
+
+The `half` split is the result. Per model-init seed (held-out test accuracy):
+
+| seed | `none` | `learned` (per-class T / F) |
+|------|--------|------------------------------|
+| 1337 | 100%   | 69%  (T 38% / F 100%) |
+| 1338 | 99.9%  | 50%  (T 100% / F 0%) |
+| 1339 | 100%   | 61.5% (T 23% / F 100%) |
+| 1340 | 100%   | 51.25% (T 2.5% / F 100%) |
+| **mean** | **≈100%** | **≈58%** |
+| in-dist **val** | 100% (all) | 100% (all) |
+
+Two things to read off this table (*val* = accuracy on trained positions; *test* = accuracy on the
+held-out positions):
+1. **Both learn the task** (val = 100%); only `none` **generalizes** to the held-out positions.
+2. **`learned` collapses to one label** — look at its T/F columns: each seed is near 0/100 or
+   100/0, and *which* label it defaults to flips by seed. So ~58% is a collapse, not a clean 50%.
+
+> ⚠️ **Caveat on these numbers.** The 4 seeds vary **model init / batch order only**, on **one
+> fixed data split** (seed-1337 data). So the spread reflects initialization noise, **not**
+> data-sampling noise, and understates true variance. The gap (100 vs 58) is far larger than that
+> noise, so the conclusion holds — but the stronger check is to regenerate the split per seed (see
+> *Next*).
 
 ---
 
 ## Figures
 
-Generated by `plot.py` from the accumulated `results.csv` / `predictions.csv` (every
-train+eval run appends rows; the figures regenerate themselves as methods/seeds are added).
-The PNGs are committed under [`figures/`](figures/) and embedded by relative path below.
-Regenerate them in place with:
-`../venv/bin/python plot.py --split=half --out_dir=log/figures`.
+From `results.csv` / `predictions.csv` via `plot.py` (committed under [`figures/`](figures/);
+regenerate with `../venv/bin/python plot.py --split=half --out_dir=log/figures`).
 
-**1. Held-out accuracy by method** (`figures/heldout_accuracy_half.png`) — the conclusion.
-`none` at 100%, `learned` at ~58% hugging the chance line; both val bars at 100% (so the
-gap is a generalization failure, not a training failure). Error bars = std over 4 seeds.
-<img src="figures/heldout_accuracy_half.png" alt="held-out accuracy: none 100% vs learned ~58% (chance line at 50%)" width="640">
+**1 — Held-out accuracy by method (the conclusion).** `none` at 100%, `learned` near the chance
+line; both in-distribution val bars at 100%, so the gap is a *generalization* failure, not a
+training failure.
+
+<img src="figures/heldout_accuracy_half.png" alt="held-out accuracy: none 100% vs learned ~58% at the 50% chance line; both val 100%" width="620">
+
+**2 — Per-position accuracy (the *why*).** Each cell = accuracy with `X` at that row, `Y` at that
+column, over a sweep of all position pairs. `none` is green everywhere. `learned` is green in the
+trained block (top-left, both in first half) but in the held-out block (bottom-right) it **fails
+wherever the answer is `T`** (the red upper triangle, X before Y) while still getting `F` cases — i.e.
+off the trained region it stops distinguishing order and falls back to one label.
+
+<img src="figures/per_position_half.png" alt="per-position heatmap: none green everywhere; learned green in trained block, red in held-out block" width="820">
+
+*(A per-class T/F bar chart is also produced (`heldout_perclass_half.png`) but not embedded — the
+heatmap shows the label collapse more directly.)*
+
+---
+
+## Details
+
+### Run 1 — `single_pos` (hold out one position): too easy
+**Purpose.** Direct parallel to the detection task's position-12 hold-out.
+**Config.** Baseline model (~0.8M params), 2000 iters, **one seed (1337)**.
+**Result.** Both settings = **100%** (T and F) at the held-out position. A single held-out slot
+generalizes trivially, same as detection. Saturated on one seed, so no sweep. → need a harder split.
+
+### Run 2 — `half` (hold out the whole second half): the divergence
+**Purpose.** The hard test: special symbols are seen **only** in the first half during training.
+**Config.** Baseline model; **4 seeds (1337–1340)**. Each half has 10 positions = 90 ordered
+(X,Y) pairs — enough to learn the task in-distribution.
+**Result.** See *Results at a glance*. `none` ≈100%, `learned` ≈58% (collapse to one label).
+**Output (seed 1337):**
 ```
-none    held-out 100% (±0)   | val 100%
-learned held-out  58% (±8)   | val 100%   <- collapses toward chance
+none     val 100% | test:  T 100%  F 100%  → 100%
+learned  val 100% | test:  T  38%  F 100%  →  69%
+         (every learned error is gold=T predicted F, with X and Y both in the 2nd half)
 ```
 
-**2. Per-position accuracy heatmap** (`figures/per_position_half.png`) — the *why*. Cell =
-accuracy with X at row, Y at col, over the diagnostic sweep (all 380 position pairs). `none`
-is uniformly green (≈100%) across the train block AND the held-out block. `learned` is green
-in the train block (0–9 × 0–9) but **degrades sharply in the held-out block** (10–19 × 10–19),
-and within it the **upper triangle (X<Y → T) goes red while the lower triangle (X>Y → F)
-stays green** — the collapse-to-one-label, made spatial.
-<img src="figures/per_position_half.png" alt="per-position heatmap: none flat green; learned green train-block, red held-out T-triangle" width="820">
+### Why this happens
+- **`none` (NoPE)** can only use the causal mask's *relative* order — "have I passed an `X`
+  before reaching `Y`?" That is position-agnostic, so a circuit learned on the first half works
+  unchanged on the second. → generalizes.
+- **`learned` (APE)** *does* have trained position vectors for slots 10–19 (digits sit there in
+  training), but it appears to tie the order computation to the **absolute positions where `X`/`Y`
+  appeared** — the first half. Off-distribution it misfires and defaults to one label. → chance.
+- This last point is a **hypothesis** from the behavior + heatmap, not yet proven; Phase 7
+  interpretability is what would confirm it.
 
-*(A per-class T-vs-F chart is also produced by `plot.py` (`heldout_perclass_<split>.png`) but
-is not embedded here — the heatmap above shows the label collapse more directly. The collapse
-direction is seed-dependent, so that chart overlays per-seed dots rather than trusting the
-mean.)*
+### Relation to prior work
+This reproduces the NoPE-vs-APE finding of **Kazemnejad et al. (2023)**, *The Impact of Positional
+Encoding on Length Generalization in Transformers* (NeurIPS 2023; abstract verified). They show it
+for **length generalization** — testing on *longer* sequences. Here it appears in a **fixed-length,
+held-out-position** setting: the shift is over *where* a symbol sits within a fixed length, not over
+length. That fixed-length angle is the contribution.
 
-## Conclusion
-
-The held-out-position phenomenon is real for relative order — and it appears **only on the
-half split, not the single position**, and it **reverses the naive expectation**: removing
-positional encoding *helps* generalization here.
-
-- **`none` (NoPE)** is forced to use the causal mask's *relative* ordering ("have I passed an
-  X before reaching Y?"), which is position-agnostic — so a circuit learned on the first half
-  transfers to the second half unchanged. ~100% held-out.
-- **`learned` (absolute PE)** has trained position vectors for 10..19 (every example has
-  digits there), but it apparently builds the order computation on absolute-position features
-  tied to where X/Y appeared in training (first half). Off-distribution it misfires and
-  defaults to one label → ~chance.
-
-This matches the NoPE-vs-learned-APE finding of **Kazemnejad et al. (2023)**, *The Impact of
-Positional Encoding on Length Generalization in Transformers* (NeurIPS 2023), who report it for
-**length generalization** (testing on longer sequences); here it is reproduced in the project's
-**fixed-length, held-out-position** setting — the shift is over symbol *position* within a fixed
-length, not over length. This is the meeting headline and the motivating result for the full PE sweep.
-
-**Caveat:** seed sweep here varies only model init / batch order; the *data* is one fixed
-half split (seed 1337). A stronger check later: regenerate data across seeds too.
+---
 
 ## Next
-
-1. **Phase 3 — fill in `sinusoidal` / `rope` / `t5`** and run the 5-way PE sweep on the
-   **half** split (the split that separates methods). Hypotheses to test: does RoPE / T5
-   (relative PEs) generalize like NoPE, while sinusoidal (absolute) fails like learned?
-2. **Strengthen the sweep** — regenerate data per seed; report mean/variance.
-3. **(Phase 7) interpretability** — confirm the mech/abs-position story above directly.
-4. Consider a **distance-based held-out split** (option D) as an additional axis.
+1. **Phase 3 — the PE sweep.** Implement `sinusoidal` / `rope` / `t5` and run all five on the
+   `half` split. Hypothesis: relative PEs (RoPE, T5) generalize like `none`; the absolute one
+   (sinusoidal) fails like `learned`.
+2. **Strengthen the sweep** — regenerate the data split per seed, so error bars include
+   data-sampling variance (addresses the caveat above).
+3. **Phase 7 interpretability** — test the absolute-position-reliance story directly.
+4. Optional: a **distance-based** held-out split as a second generalization axis.
