@@ -110,8 +110,9 @@ permutation-invariant**. The causal mask lets the representation at each positio
 only on tokens at or before it, so the model can learn *"by the time I reach `Y`, have I
 already seen an `X`?"* — i.e., the causal mask itself supplies the ordering signal that
 explicit positional encoding was supposed to provide. So `none` ≠ "no position info" for a
-decoder. This is the documented NoPE behavior of decoder-only transformers (cf. the
-positional-encoding paper on the reading list — to review before citing).
+decoder. This is the documented NoPE behavior of decoder-only transformers (cf. Kazemnejad
+et al. (2023), *The Impact of Positional Encoding on Length Generalization in Transformers*,
+NeurIPS 2023, who show NoPE can reconstruct absolute position from the causal mask).
 
 ---
 

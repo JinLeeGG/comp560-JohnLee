@@ -129,10 +129,11 @@ positional encoding *helps* generalization here.
   tied to where X/Y appeared in training (first half). Off-distribution it misfires and
   defaults to one label → ~chance.
 
-This matches the known NoPE-vs-learned-APE result from the length-generalization literature
-(the positional-encoding paper on the reading list — to review before citing), now reproduced
-in the project's **fixed-length, held-out-position** setting. This is the meeting headline and
-the motivating result for the full PE sweep.
+This matches the NoPE-vs-learned-APE finding of **Kazemnejad et al. (2023)**, *The Impact of
+Positional Encoding on Length Generalization in Transformers* (NeurIPS 2023), who report it for
+**length generalization** (testing on longer sequences); here it is reproduced in the project's
+**fixed-length, held-out-position** setting — the shift is over symbol *position* within a fixed
+length, not over length. This is the meeting headline and the motivating result for the full PE sweep.
 
 **Caveat:** seed sweep here varies only model init / batch order; the *data* is one fixed
 half split (seed 1337). A stronger check later: regenerate data across seeds too.

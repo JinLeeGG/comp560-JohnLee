@@ -65,9 +65,11 @@ but on the held-out second half **`none` generalizes ~perfectly while `learned` 
 - **`learned` (absolute PE)** builds the computation on absolute-position features tied to the
   training positions (first half); off-distribution it misfires → chance.
 
-This matches the known NoPE-vs-learned-APE result in the length-generalization literature
-(the PE paper on the reading list — review before citing), now reproduced in this project's
-**fixed-length, held-out-position** setting. It is the motivating result for the full PE sweep.
+This matches the NoPE-vs-learned-APE finding of **Kazemnejad et al. (2023)**, *The Impact of
+Positional Encoding on Length Generalization in Transformers* (NeurIPS 2023), who report it for
+**length generalization** (testing on longer sequences); here it is reproduced in a
+**fixed-length, held-out-position** setting — the shift is over symbol *position* within a fixed
+length, not over length. It is the motivating result for the full PE sweep.
 See [log/2026-06-20-relative-order-heldout-splits.md](log/2026-06-20-relative-order-heldout-splits.md).
 
 <img src="log/figures/heldout_accuracy_half.png" alt="held-out accuracy by PE: none 100%, learned ~58% at chance line; both val 100%" width="640">
