@@ -70,7 +70,7 @@ def clip_err(means, stds):
 
 
 # ----------------------------- bar charts (from results.csv) -----------------------------
-def plot_bars(split, out_dir):
+def plot_bars(split, out_dir, methods_filter=None, suffix=''):
     rows = [r for r in read_csv('results.csv') if r['split'] == split]
     if not rows:
         print(f"[bars] no results.csv rows for split={split}; skipping")
@@ -86,6 +86,8 @@ def plot_bars(split, out_dir):
         if r['val_acc'] != '':
             g['val'].append(float(r['val_acc']) * 100)
     methods = methods_present(grouped)
+    if methods_filter:
+        methods = [m for m in methods if m in methods_filter]
     nseeds = {m: len(grouped[m]['heldout']) for m in methods}
 
     # --- Figure 1: held-out vs val, grouped bars ---
@@ -103,13 +105,12 @@ def plot_bars(split, out_dir):
            color='#bdbdbd', alpha=0.7, label='in-dist. val')
     ax.axhline(CHANCE, ls='--', color='crimson', lw=1.3, label='chance (50%)')
 
-    for i, (xi, m) in enumerate(zip(x, methods)):
-        ax.text(xi - w / 2, min(ho_mean[i] + ho_std[i] + 2.5, 103),
+    for i in range(len(methods)):
+        ax.text(x[i] - w / 2, min(ho_mean[i] + ho_std[i] + 2.5, 103),
                 f"{ho_mean[i]:.0f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
-        ax.text(xi, -7, f"n={nseeds[m]}", ha='center', va='top', fontsize=8, color='gray')
 
     ax.set_xticks(x)
-    ax.set_xticklabels(methods)
+    ax.set_xticklabels([f"{m}\n(n={nseeds[m]})" for m in methods])
     ax.set_ylim(0, 105)
     ax.set_ylabel('accuracy (%)')
     ax.set_xlabel('positional encoding')
@@ -118,7 +119,7 @@ def plot_bars(split, out_dir):
                  fontsize=11)
     ax.legend(loc='lower left')
     fig.tight_layout()
-    p1 = os.path.join(out_dir, f'heldout_accuracy_{split}.png')
+    p1 = os.path.join(out_dir, f'heldout_accuracy_{split}{suffix}.png')
     fig.savefig(p1, dpi=150)
     plt.close(fig)
     print(f"[bars] wrote {p1}  (methods: {methods})")
@@ -151,7 +152,7 @@ def plot_bars(split, out_dir):
                  fontsize=11)
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=4, fontsize=8)
     fig.tight_layout()
-    p2 = os.path.join(out_dir, f'heldout_perclass_{split}.png')
+    p2 = os.path.join(out_dir, f'heldout_perclass_{split}{suffix}.png')
     fig.savefig(p2, dpi=150)
     plt.close(fig)
     print(f"[bars] wrote {p2}")
@@ -184,7 +185,7 @@ def annotate_regions(ax, split):
         ax.text(LENGTH - 1, P, f'X@{P}', color='blue', fontsize=8, ha='right', va='center')
 
 
-def plot_per_position(split, out_dir):
+def plot_per_position(split, out_dir, methods_filter=None, suffix=''):
     rows = [r for r in read_csv('predictions.csv') if r['split'] == split]
     if not rows:
         print(f"[heatmap] no predictions.csv rows for split={split}; skipping")
@@ -200,6 +201,8 @@ def plot_per_position(split, out_dir):
         acc_sum[key] += int(r['correct'])
         acc_cnt[key] += 1
     methods = [m for m in METHOD_ORDER if m in seen]
+    if methods_filter:
+        methods = [m for m in methods if m in methods_filter]
 
     # constrained_layout reserves space for the colorbar and suptitle so nothing overlaps
     # (mixing subplots_adjust + colorbar(ax=...) + bbox_inches='tight' caused the bar to
@@ -228,7 +231,7 @@ def plot_per_position(split, out_dir):
                  fontsize=12)
     cbar = fig.colorbar(im, ax=axes[0].tolist(), fraction=0.046, pad=0.03)
     cbar.set_label('accuracy')
-    p = os.path.join(out_dir, f'per_position_{split}.png')
+    p = os.path.join(out_dir, f'per_position_{split}{suffix}.png')
     fig.savefig(p, dpi=150)
     plt.close(fig)
     print(f"[heatmap] wrote {p}  (methods: {methods})")
@@ -237,8 +240,13 @@ def plot_per_position(split, out_dir):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--split', default='half', help="which split to plot (none|single_pos|half)")
+    ap.add_argument('--methods', default='',
+                    help="comma-separated subset, e.g. none,learned (default: all present). "
+                         "A subset appends '_<methods>' to the output filenames.")
     ap.add_argument('--out_dir', default='out')
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
-    plot_bars(args.split, args.out_dir)
-    plot_per_position(args.split, args.out_dir)
+    methods_filter = [m.strip() for m in args.methods.split(',') if m.strip()] or None
+    suffix = '' if not methods_filter else '_' + '-'.join(methods_filter)
+    plot_bars(args.split, args.out_dir, methods_filter, suffix)
+    plot_per_position(args.split, args.out_dir, methods_filter, suffix)

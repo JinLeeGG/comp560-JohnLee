@@ -47,32 +47,40 @@ appear**, generalizing detection's hold-out to *two* symbols:
 All pools stay 50/50 T/F (chance = 50%); `prepare.py` asserts the label mapping **and**
 the split rule on every example before writing the bins.
 
-## Headline result — removing positional encoding *helps* generalization
+## Headline result — *relative* PE generalizes, *absolute* PE doesn't
 
-| `SPLIT` | `none` (NoPE) held-out | `learned` (abs. PE) held-out | verdict |
-|---------|------------------------|------------------------------|---------|
-| `none` (full dist.) | **100%** | **100%** | both solve it |
-| `single_pos` (P=12) | **100%** | **100%** | both generalize (too easy) |
-| `half` (2nd half held out) | **≈100%** (seeds: 100/99.9/100) | **≈58%** (seeds: 69/50/61.5/51) | **they diverge** |
+5-way PE sweep on the `half` split (held out the 2nd half), 4 seeds each. Every method reaches
+**100% in-distribution val** (all *learn* the task); they split sharply on the held-out test, and
+the split is exactly **relative vs absolute**:
 
-On the **half** split every run reaches 100% *in-distribution* val (both *learn* the task),
-but on the held-out second half **`none` generalizes ~perfectly while `learned` collapses to
-~chance**, defaulting to (mostly) one label. This **reverses the naive "PE helps" intuition**:
+| PE | family | held-out test |
+|----|--------|---------------|
+| `none` (NoPE) | relative (causal mask) | **≈100%** |
+| `rope` | relative | **≈100%** |
+| `t5` | relative | **100%** |
+| `learned` | absolute | **≈58%** (≈ chance) |
+| `sinusoidal` | absolute | **≈33%** (below chance) |
 
-- **`none` (NoPE)** is forced onto the causal mask's *relative* ordering ("have I passed an
-  X before reaching Y?"), which is position-agnostic, so a first-half circuit transfers to the
-  second half unchanged.
-- **`learned` (absolute PE)** builds the computation on absolute-position features tied to the
-  training positions (first half); off-distribution it misfires → chance.
+| `SPLIT` | result |
+|---------|--------|
+| `none` (full dist.) | all methods 100% |
+| `single_pos` (P=12) | trivial — 100% (one held-out slot generalizes for free) |
+| `half` (2nd half held out) | **relative ≈100% vs absolute ≤58%** (table above) |
 
-This matches the NoPE-vs-learned-APE finding of **Kazemnejad et al. (2023)**, *The Impact of
-Positional Encoding on Length Generalization in Transformers* (NeurIPS 2023), who report it for
-**length generalization** (testing on longer sequences); here it is reproduced in a
-**fixed-length, held-out-position** setting — the shift is over symbol *position* within a fixed
-length, not over length. It is the motivating result for the full PE sweep.
-See [log/2026-06-20-relative-order-heldout-splits.md](log/2026-06-20-relative-order-heldout-splits.md).
+The relative family expresses the answer through *relative* offsets (causal mask / rotation /
+relative bias), so a rule learned in the first half transfers to the second. The absolute family
+ties the computation to *absolute* slot identities seen in training, so off-distribution it
+misfires and collapses to one label. This **reverses the naive "PE helps" intuition** — here the
+*absolute-position representation* is exactly what breaks generalization.
 
-<img src="log/figures/heldout_accuracy_half.png" alt="held-out accuracy by PE: none 100%, learned ~58% at chance line; both val 100%" width="640">
+This reproduces — across a whole PE family — the NoPE-vs-absolute-PE finding of **Kazemnejad et
+al. (2023)**, *The Impact of Positional Encoding on Length Generalization in Transformers*
+(NeurIPS 2023), who report it for **length generalization** (longer sequences); here it appears in
+a **fixed-length, held-out-position** setting — the shift is over symbol *position* within a fixed
+length, not over length.
+See [log/2026-06-20-relative-order-pe-sweep.md](log/2026-06-20-relative-order-pe-sweep.md).
+
+<img src="log/figures/heldout_accuracy_half.png" alt="held-out accuracy by PE: none/rope/t5 ~100%, learned ~58%, sinusoidal ~33%; all val 100%" width="900">
 
 *(the per-position heatmap `log/figures/per_position_half.png` shows the mechanism — see the
 [held-out log](log/2026-06-20-relative-order-heldout-splits.md).)*
@@ -173,20 +181,27 @@ are gitignored; `results.csv` and `log/figures/*.png` are kept.
 
 | Date | Experiment | Status |
 |------|------------|--------|
-| 2026-06-20 | [Relative-order — full-distribution baselines (none vs learned)](log/2026-06-20-relative-order-baselines.md) | ✅ both 100% (none surprising) |
-| 2026-06-20 | [Held-out position splits (single_pos, half)](log/2026-06-20-relative-order-heldout-splits.md) | ✅ **phenomenon found on `half`: NoPE ≈100%, learned ≈58%** |
-| _next_ | Phase 3 — fill in sinusoidal/rope/t5, 5-way PE sweep on `half` | — |
+| 2026-06-20 | [Full-distribution baselines (none vs learned)](log/2026-06-20-relative-order-baselines.md) | ✅ both 100% (none surprising) |
+| 2026-06-20 | [Held-out positions — the phenomenon (none vs learned)](log/2026-06-20-relative-order-heldout-splits.md) | ✅ `half`: NoPE ≈100% vs learned ≈58% |
+| 2026-06-20 | [PE sweep — Phase 3 (all 5 encodings)](log/2026-06-20-relative-order-pe-sweep.md) | ✅ **relative (none/rope/t5) ≈100% vs absolute (learned 58% / sinusoidal 33%)** |
+| _next_ | Strengthen sweep (data reseed) · more splits · Phase 4 minimal model | — |
 
 To switch splits, edit `SPLIT` (and `HELDOUT_POS`) at the top of
 [data/order/prepare.py](data/order/prepare.py), regenerate, then train+eval as above.
 
+**New experiments:** copy [log/_TEMPLATE.md](log/_TEMPLATE.md) → `log/YYYY-MM-DD-<slug>.md`. It
+bakes in the reproducibility fields (commit · exact command · config · seeds · env · caveats),
+so every result is traceable to the code and data that made it. Keep day-to-day notes (decisions,
+dead ends) in the separate running/activity log.
+
 ---
 
 ## Next Steps
-- **Phase 3 — PE sweep on the `half` split** (the split that separates methods). Fill in
-  `sinusoidal` / `rope` / `t5`, then run all five. Hypothesis: relative PEs (RoPE, T5)
-  generalize like NoPE; absolute PEs (sinusoidal) fail like learned.
+- **Phase 3 — PE sweep: ✅ done.** All five PEs implemented and run on the `half` split;
+  relative (none/rope/t5) ≈100%, absolute (learned/sinusoidal) ≤58%. Hypothesis confirmed.
 - **Strengthen the seed sweep** — regenerate data per seed (current sweep varies only
   model init / batch order on one fixed half split), report mean/variance.
+- **More splits** — even/odd and distance-based hold-outs, to test whether the
+  relative/absolute line holds across generalization axes.
+- **Phase 4 — minimal model** — shrink layers/heads, re-check the separation.
 - **(Phase 7) interpretability** — confirm the relative-vs-absolute mechanism story.
-- Consider a **distance-based held-out split** (option D) as an additional axis.
