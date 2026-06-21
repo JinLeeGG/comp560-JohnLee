@@ -1,6 +1,6 @@
 # Relative-Order Task — held-out positions (the phenomenon)
 
-*2026-06-20 · commit `f6642dc` (+ uncommitted edits — commit to pin) · John Lee*
+*2026-06-20 · commit `8213fcd` · John Lee*
 
 > **Bottom line.** Tested at symbol positions **never seen in training** (second half of the
 > string), `none` (no positional encoding) still scores **~100%**, while `learned` (absolute PE)

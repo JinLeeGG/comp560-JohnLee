@@ -1,6 +1,6 @@
 # Relative-Order Task — full-distribution baselines (`none` vs `learned`)
 
-*2026-06-20 · commit `f6642dc` (+ uncommitted edits — commit to pin) · John Lee*
+*2026-06-20 · commit `8213fcd` · John Lee*
 
 > **Bottom line.** On the full position distribution, **both** settings solve the task at
 > **100%** — including `none`, which has **no positional encoding**. A causal decoder gets the

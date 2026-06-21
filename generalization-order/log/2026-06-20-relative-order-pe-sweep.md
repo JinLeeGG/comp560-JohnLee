@@ -1,6 +1,6 @@
 # Relative-Order Task — the positional-encoding sweep (Phase 3)
 
-*2026-06-20 · commit `f6642dc` (+ uncommitted Phase-3 edits — commit to pin) · John Lee*
+*2026-06-20 · commit `8213fcd` · John Lee*
 
 > **Bottom line.** Extending the [held-out experiment](2026-06-20-relative-order-heldout-splits.md)
 > from 2 encodings to all 5: on held-out positions, the **relative** family — `none` (causal
@@ -105,6 +105,15 @@ gap is a *generalization* failure, not a training failure.
   seen in training (0–9). On the held-out positions (10–19) those features don't carry the learned
   meaning, so the model misfires and falls back to one label — `sinusoidal`'s fixed table even flips
   it below chance. → fails.
+
+> **A sharper point on `sinusoidal` vs `learned`.** Both are absolute, but they fail differently.
+> `learned` collapses to ~chance (it loses the signal on the held-out positions and defaults to one
+> label). `sinusoidal` goes *below* chance (~33%): its fixed sin/cos table produces a definite but
+> *wrong* signal in the held-out half, so the model is confidently incorrect rather than merely
+> guessing. So an absolute representation isn't just unhelpful on held-out positions — a fixed one
+> can be actively misleading. This is the cleanest split *within* the absolute family
+> (learned-but-lost vs fixed-and-wrong).
+
 - This mechanism (absolute-feature reliance) is consistent with the figures but is still a
   **hypothesis**; Phase 7 interpretability is what would confirm it directly.
 
