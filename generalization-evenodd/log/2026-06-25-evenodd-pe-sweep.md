@@ -113,14 +113,48 @@ the computation to absolute slot identities seen in training) — here on a *dis
 
 <img src="figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: all five PEs flat at 50% across every held-out distance" width="640">
 
-*All five methods lie exactly on the chance line at every separation (per-distance n shown,
-80–720 pooled over seeds) — the collapsed signature of "nothing learned."*
+**How to read it.** The x-axis is the distance between the two `X`'s (1–9); the y-axis is
+accuracy; each line is one PE; the dashed line at 50% is pure guessing. (Each point pools the
+4 seeds, n = 80–720 per distance.)
 
-The other three figures (in `figures/`) tell the same story:
+**What it shows.** Every line lies flat on the 50% line at every distance. This was meant to be
+*the* graph of the experiment — distance-aware methods (`rope`, `t5`) doing well at short gaps
+and tailing off as the gap grows. But because no model learned the task, all five sit flat at
+chance; the shape it was designed to reveal only appears once a model actually learns.
 
-- `heldout_accuracy_half.png` — every method at 50% held-out **and** 50% val.
-- `heldout_perclass_half.png` — the bimodal 0/100 per-class collapse.
-- `per_position_half.png` — the per-position heatmap averages to ~50% per cell.
+The other three figures tell the same story:
+
+<img src="figures/heldout_accuracy_half.png" alt="bar chart: every PE at 50% on both held-out test and in-distribution val" width="640">
+
+**How to read it.** For each PE, the blue bar is accuracy on the held-out positions (10–19,
+never trained on); the gray bar is accuracy on in-distribution val (0–9, the same positions it
+*did* train on).
+
+**What it shows.** The gray bar is *also* 50% — the model never even got the training region
+right. So this is not "learned the task but failed to generalize"; it is "never learned at
+all." (A true generalization failure would be a tall gray bar beside a short blue one.)
+
+<img src="figures/heldout_perclass_half.png" alt="per-class held-out accuracy: T and F bars at 50% mean, with per-seed dots at the 0 and 100 extremes" width="640">
+
+**How to read it.** The same held-out accuracy, split by the correct answer: green = T (even
+distance) cases, orange = F (odd distance) cases. Bars are the mean over seeds; each dot is one
+seed.
+
+**What it shows.** The dots sit at 0% and 100%, not scattered around 50%. Each run does not
+guess randomly — it answers the *same* label for everything: some seeds say T to every input
+(T = 100%, F = 0%), others say F to every input. Averaged together this looks like 50%, but no
+single run is ever "half right."
+
+<img src="figures/per_position_half.png" alt="per-position accuracy heatmaps for all five PEs: every sampled cell uniformly around 50%" width="640">
+
+**How to read it.** One heatmap per PE. A cell is the accuracy when the first `X` sits at the
+row position and the second `X` at the column position; color runs red (0%) → yellow (50%) →
+green (100%). The black box is the train region (both `X`'s in 0–9), the blue box the held-out
+region (both in 10–19); gray cells are position pairs that never occur.
+
+**What it shows.** Every cell is yellow (~50%) — inside the black train box and the blue
+held-out box alike. The model solves no placement of the two `X`'s anywhere, which is why even
+the training region sits at chance.
 
 ---
 
