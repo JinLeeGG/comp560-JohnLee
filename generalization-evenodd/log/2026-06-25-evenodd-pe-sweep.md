@@ -2,23 +2,37 @@
 
 *2026-06-25 · commit `<pending>` · John Lee*
 
-> **Bottom line.** A micro-transformer (<1M params) **cannot learn even/odd
-> distance-parity at all** — every PE, every seed sits at exactly 50% on *in-distribution*
-> val (loss locked at ln 2), so the intended NoPE-vs-distance held-out comparison is moot
-> at micro scale. The task is genuinely learnable, though: a deliberately oversized 4.76M
-> model reaches **100% in-distribution** in ~2000 iters — making this a **capacity wall**,
-> not a degenerate task. At that learnable scale, absolute PE (`learned`) **learns the task
-> but fails to generalize** to held-out positions (44.85%, below chance) — the same
-> "learns-but-doesn't-generalize" signature seen on relative order, now on a *distance*
-> task.
+> **Bottom line.**
+>
+> 1. A micro-transformer (<1M params) **cannot learn even/odd distance-parity at all** —
+>    every PE, every seed sits at exactly 50% on *in-distribution* val (loss locked at
+>    ln 2), so the intended NoPE-vs-distance held-out comparison is moot at micro scale.
+> 2. The task is genuinely learnable, though: a deliberately oversized 4.76M model reaches
+>    **100% in-distribution** in ~2000 iters — making this a **capacity wall**, not a
+>    degenerate task.
+> 3. At that learnable scale, absolute PE (`learned`) **learns the task but fails to
+>    generalize** to held-out positions (44.85%, below chance) — the same
+>    "learns-but-doesn't-generalize" signature seen on relative order, now on a *distance*
+>    task.
 
 ### The task
 
-Fixed length 20, the symbol `X` appears **exactly twice** (no `Y` — two identical
-targets), 18 random digit distractors. Distance `= |pos2 − pos1|`; label `T` iff the
-distance is **even**, else `F`. One example: `482X50178X4019285746:T` (X at 3 & 9 →
-distance 6 → even → T). `none` = NoPE (no positional encoding); `learned`/`sinusoidal` =
-absolute PE; `rope`/`t5` = relative/distance-aware PE.
+- **Input** — a fixed string of **20 characters**. The symbol `X` appears
+  **exactly twice** (no `Y`; the two targets are identical); the other 18 are
+  random digits.
+- **Distance** — `|pos2 − pos1|`, how far apart the two `X`'s are.
+- **Label** — `T` if that distance is **even**, `F` if it is **odd**.
+
+```
+482X50178X4019285746 : T     X at 3 and 9  →  distance 6 (even)  →  T
+482X5017X64019285746 : F     X at 3 and 8  →  distance 5 (odd)   →  F
+```
+
+The five positional encodings compared (the one knob that changes, `pos_type`):
+
+- `none` — **NoPE**: no positional encoding at all
+- `learned`, `sinusoidal` — **absolute** PE (encodes each fixed slot)
+- `rope`, `t5` — **relative / distance-aware** PE (encodes the gap between positions)
 
 Even/odd of a difference is the XOR of the two position-parities, so the task reduces to
 *"are the two X's on positions of the same parity?"* — a parity-flavored function.
@@ -27,13 +41,16 @@ Even/odd of a difference is the XOR of the two position-parities, so the task re
 
 ## Setup  <!-- R1/R3/R6 -->
 
-- **data / split:** length 20, two `X`'s; `half` split — train/val both X in 0–9, held-out
-  test both X in 10–19. 50k train / 5k val / 2k test, all **50/50 T/F**; held-out test is
-  **distance-balanced** (distances 2/4/6/8 → 250 each, 1/3/5/7/9 → 200 each). Chance = 50%.
-  `prepare.py` asserts label-correctness (`|pos2−pos1|` even iff T) and the split rule.
-- **model / config:** the micro baseline — `n_layer=4, n_head=4, n_embd=128`, **0.80M
-  params**, `block_size=64`; AdamW, `lr=1e-3` cosine, `max_iters=2000`, `batch_size=64`,
-  answer-token-only loss; CPU.
+- **data:** length 20, two `X`'s; pools 50k train / 5k val / 2k test, all **50/50 T/F**
+  (chance = 50%).
+- **split (`half`):** train/val both X in 0–9; held-out test both X in 10–19. The held-out
+  test is **distance-balanced** (distances 2/4/6/8 → 250 each, 1/3/5/7/9 → 200 each).
+- **checks:** `prepare.py` asserts label-correctness (`|pos2−pos1|` even iff T) and the
+  split rule.
+- **model:** the micro baseline — `n_layer=4, n_head=4, n_embd=128` (**0.80M params**),
+  `block_size=64`.
+- **optimizer / schedule:** AdamW · `lr=1e-3` cosine · `max_iters=2000` · `batch_size=64`.
+- **loss / device:** answer-token-only loss · CPU.
 - **seeds:** 1337–1340 (vary model init + batch order only; **one fixed data split**).
 - **env:** python 3.9.6 · torch 2.8.0 · numpy 2.0.2 · matplotlib 3.9.4; data `SEED=1337`.
 - **reproduce:**
@@ -97,10 +114,13 @@ the computation to absolute slot identities seen in training) — here on a *dis
 <img src="figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: all five PEs flat at 50% across every held-out distance" width="640">
 
 *All five methods lie exactly on the chance line at every separation (per-distance n shown,
-80–720 pooled over seeds) — the collapsed signature of "nothing learned."* The bar chart
-(`figures/heldout_accuracy_half.png`) shows every method at 50% held-out **and** 50% val;
-the per-class chart (`figures/heldout_perclass_half.png`) shows the bimodal 0/100 collapse;
-the per-position heatmap (`figures/per_position_half.png`) averages to ~50% per cell.
+80–720 pooled over seeds) — the collapsed signature of "nothing learned."*
+
+The other three figures (in `figures/`) tell the same story:
+
+- `heldout_accuracy_half.png` — every method at 50% held-out **and** 50% val.
+- `heldout_perclass_half.png` — the bimodal 0/100 per-class collapse.
+- `per_position_half.png` — the per-position heatmap averages to ~50% per cell.
 
 ---
 
