@@ -114,17 +114,22 @@ Generalization to held-out positions, however, is **partial and strongly seed-de
 | `t5` | relative | 100% | 67.5% | **85**/50/50/**85** | 2/4 |
 
 The one robust separation: **absolute `learned` (APE) never generalizes** (collapses to
-"near" on all 4 seeds); every other PE generalizes on ≥1 seed. Generalizing seeds read
-**coarse distance** — perfect except *at* the threshold (d5≈0, d6≈chance), crisp once clearly
-far (d7–9) — but with a **position/extrapolation-depth fade** (correct near the train
-boundary, wrong deeper into the held-out half), so it is distance-organized **bands with a
-position fade**, not pure distance transfer. Full writeup:
-[log/2026-06-26-distd-pe-sweep.md](log/2026-06-26-distd-pe-sweep.md).
+"near" on all 4 seeds); every other PE generalizes on ≥1 seed. But the held-out means are
+**not a ranking** at n=4 (the middle four are within noise), and what transfers across
+positions is mainly the **near** class: pooled over seeds the far (T) side stays **at/below
+chance for every distance d5–9** — only a *minority* of seeds (e.g. t5/1337, t5/1340,
+none/1339) recover the far side. Even on those seeds accuracy at a *fixed* distance depends on
+position (correct near the trained boundary, wrong deeper in), so **distance-reading vs a
+position shortcut is unresolved and leans toward the shortcut** — the per-position heatmaps
+look more block-like (position) than band-like (distance). Method B (distance-held-out) is the
+clean test. Full writeup: [log/2026-06-26-distd-pe-sweep.md](log/2026-06-26-distd-pe-sweep.md).
 
-<img src="log/figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: ~100% at distances 1-4, collapse at the D=5 threshold, then rising with distance for all PEs except learned (flat at 0)" width="620">
+<img src="log/figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: ~100% at distances 1-4, collapse at the D=5 threshold, far side stays at/below chance for all PEs in the pool; learned flat at 0" width="620">
 
-*Accuracy-vs-separation (held-out region): near distances (1–4) solved, a collapse right at
-the D=5 threshold, then a monotone rise with separation for every PE except `learned`.*
+*Accuracy-vs-separation (held-out region, pooled over seeds): near distances (1–4) solved,
+then at/beyond the D=5 threshold every PE sits **at or below chance** on the far side —
+generalization in the pool is mostly the near class, not recovered far. `learned` is flat at
+0% (always "near").*
 
 ---
 

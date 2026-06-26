@@ -9,19 +9,31 @@
 >    even/odd parity was unlearnable at this scale, dist≥D is not. So the even/odd wall was
 >    about parity's **exactness**, not about distance-reading in general.
 > 2. Held-out (generalize-to-unseen-positions) accuracy is **partial and strongly
->    seed-dependent**: mean held-out **t5 68% · sinusoidal 61% · none 59% · rope 55% ·
->    learned 50%**, with large per-seed spread (std up to ~18 pts). This is *not* the clean
->    "NoPE fails / distance-aware wins" story even/odd was meant to deliver.
+>    seed-dependent**, and most of it is the *near* class transferring while *far* is
+>    predicted "near". The held-out means (t5 68 · sinusoidal 61 · none 59 · rope 55 ·
+>    learned 50) have large per-seed spread (σ up to ~18) and are **not a real ranking** at
+>    n=4 — the middle four are within noise. This is *not* the clean "NoPE fails /
+>    distance-aware wins" story even/odd was meant to deliver.
 > 3. The one **robust** separation: absolute **`learned` (APE) never generalizes** — all 4
 >    seeds collapse to exactly 50% (predict "near" for everything). Every other PE
 >    generalizes on **at least one** seed. On a *distance* task the absolute method is
 >    uniquely worst — consistent with APE "learns-but-doesn't-generalize" on relative-order
 >    and on even/odd@4.76M.
-> 4. **Mechanism (generalizing seeds):** coarse distance reading — perfect on near (d1–4) and
->    *clearly* far (d7–9), but **fails right at the threshold (d5≈0%, d6≈chance)**. Layered
->    on top is a **position/extrapolation-depth effect**: at a *fixed* far distance,
->    correct near the train boundary (x1≤11) and wrong deeper in (x1≥12). So the heatmap is
->    distance-organized (bands) **with a position fade** — not pure distance reading.
+> 4. **Mechanism — what actually transfers is "near", not "far".** Pooled over seeds, the
+>    held-out separation curve solves the **near** classes (d1–4 ≈ 100%) but stays **at or
+>    below chance for every far distance (d5–9)** — the far (T) side does *not* climb back to
+>    100%. So on held-out positions the models mostly predict "near" and only the near class
+>    survives. A few individual seeds *do* recover the far side (e.g. t5/1337 hits ~100% at
+>    d7–9), but that is seed-specific and washes out in the pool. Read the per-seed table, not
+>    just the pooled curve.
+> 5. **Distance vs position shortcut is unresolved (leaning shortcut).** The per-position
+>    heatmaps do **not** show clean diagonal (distance) bands in the held-out block; the
+>    held-out block is sparsely sampled and the visible structure looks closer to
+>    position **blocks** (accuracy depends on how far X2 sits to the right, i.e. on the
+>    positions themselves) than to constant-distance bands. The spec's confound — dist≥D
+>    correlating with "X's at opposite ends" — is **not ruled out and may be what's driving
+>    the partial generalization.** This is the main reason method B (distance-held-out) is
+>    needed.
 
 ### The task
 
@@ -111,22 +123,28 @@ seed error bars. `learned` sits exactly on the chance line.*
 <img src="figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: ~100% for distances 1-4, drops to near 0 at distance 5, rises with distance for non-learned methods; learned flat at 0 on the far side" width="640">
 
 *Accuracy vs separation (MacCormick's figure), pooled over seeds, held-out region only.
-Distances **1–4 (near, F) ≈ 100%**; at the threshold accuracy collapses, then **rises
-monotonically with distance** on the far side (d5→d9) for every PE *except* `learned`, which
-stays flat at 0% (always "near"). The monotone-in-distance far side is the coarse-distance
-signal.*
+The **near** classes (distances 1–4, label F) are solved at ≈100%. At and beyond the
+threshold the curves **drop to chance or below and stay there**: every far distance (d5–9)
+sits at or under the 50% line for all methods, and `learned` is flat at 0% (always predicts
+"near"). The far (T) side does **not** recover to 100% in the pool — what looks like
+generalization is mostly the near class being classified correctly while far is predicted
+"near". (Individual generalizing seeds do lift the far side; see the per-seed table.)*
 
 <img src="figures/per_position_half.png" alt="per-position heatmaps: train block solid green; held-out block shows diagonal (distance-parallel) bands of green fading to red away from the diagonal" width="900">
 
-*Per-position heatmaps (pooled). Train block (upper-left) solid green (100% in-dist). In the
-held-out block (lower-right) the green→red boundary runs **parallel to the diagonal**
-(constant distance) — distance-organized **bands**, not quadrant blocks — but the green fades
-with depth into the held-out region (the position effect quantified below). Pooling mixes
-generalizing and collapsed seeds, so read this together with the per-seed table.*
+*Per-position heatmaps (pooled). Train block (upper-left) solid green (100% in-dist). The
+**held-out block (lower-right) is sparsely sampled** and does **not** show clean
+diagonal/distance bands — the visible structure (clearest in `learned`, `sinusoidal`, `rope`)
+looks closer to position **blocks**: accuracy tracks where X2 sits (red toward the far-right
+columns) rather than the gap `|x2−x1|`. This is consistent with a position shortcut rather
+than distance reading, and is not ruled out. Pooling also mixes generalizing and collapsed
+seeds, so read this together with the per-seed table.*
 
-### Mechanism: distance, but with a position fade (the confound check)
+### Mechanism: only some seeds read distance; pooled, "near" is what transfers
 
-Per-seed held-out accuracy by distance, for the strong generalizers:
+The pooled separation curve (above) keeps the far side at/below chance. That pooled picture is
+the honest headline. *Underneath* it, a few individual seeds do recover the far side cleanly —
+here are the strong generalizers, per distance:
 
 | (PE, seed) | d1 | d2 | d3 | d4 | **d5** | **d6** | d7 | d8 | d9 |
 |---|--|--|--|--|--|--|--|--|--|
@@ -134,12 +152,14 @@ Per-seed held-out accuracy by distance, for the strong generalizers:
 | t5 / 1340 | 1.0|1.0|1.0|1.0| **.02** | **.50** |1.0|1.0|1.0|
 | none / 1339 | 1.0|1.0|1.0|1.0| **.00** | **.47** |1.0|1.0|1.0|
 
-Clean coarse-distance shape: **perfect except right at the threshold** (d5 ≈ 0, d6 ≈ chance),
-crisp once clearly far (d7–9). The coarse representation can't resolve far-vs-near *at* the
-boundary — a miniature of the parity problem, but localized to one distance.
+On *these* seeds the shape is coarse-distance-like: near solved, far solved, **failing only
+right at the threshold** (d5 ≈ 0, d6 ≈ chance) — the boundary is the hard part, a localized
+echo of the parity difficulty. But this is **a minority of seeds** (the table above is 3 of
+20 runs); most runs collapse to all-"near", which is why the pool sits at chance on the far
+side. So "coarse distance is read" is true *for some seeds*, not a property of the setup.
 
-**But it is not pure distance.** At a *fixed* far distance d=6, accuracy depends on where the
-pair sits:
+**And even on the generalizing seeds, position matters — the shortcut isn't excluded.** At a
+*fixed* far distance d=6, accuracy depends on where the pair sits:
 
 | (PE, seed) | x1=10 | x1=11 | x1=12 | x1=13 |
 |---|--|--|--|--|
@@ -147,12 +167,11 @@ pair sits:
 | t5 / 1340 | 1.0 | 0.95 | 0.05 | 0.0 |
 | none / 1339 | 1.0 | 0.90 | 0.0 | 0.0 |
 
-Pairs adjacent to the trained region (x1≤11) are classified correctly; pairs deeper into the
-held-out half (x1≥12) revert to "near". So there is a **position / extrapolation-depth**
-component on top of the distance signal — generalization decays the further the configuration
-sits from positions the model actually saw. This is exactly the confound the spec flagged
-(dist≥D correlates with "X's near the 10/15/19 ends"), and the heatmap shows it as the
-diagonal bands *fading* rather than holding.
+Pairs adjacent to the trained region (x1≤11) are correct; pairs deeper into the held-out half
+(x1≥12) revert to "near", at the *same* distance. So accuracy is driven partly by **position
+(proximity to the trained region)**, not by distance alone — exactly the confound the spec
+flagged. Distance and position are entangled on this split, which method B is designed to
+separate.
 
 ---
 
@@ -174,20 +193,28 @@ diagonal bands *fading* rather than holding.
   not: `learned` is worst, and `sinusoidal` (also absolute) only ties the noisy middle. If
   anything the relative **t5** leads — but the seed variance makes that directional, not
   conclusive. *(Hypothesis, under-powered at 4 seeds.)*
-- **Coarse distance partially survives NoPE — a refined task→method point.** NoPE generalizes
-  on 1/4 seeds (to 85%) and its separation curve has the same far-side rise as the others.
-  So *precise* distance (parity) defeats NoPE, while *coarse* distance (threshold) is
-  sometimes approximable from the causal mask — the sharpened mapping the spec anticipated.
-  *(Seed-dependent; 1/4.)*
+- **Coarse distance is read by some seeds, but held-out generalization is weak overall.** On
+  the held-out half the pool keeps the far (T) side at/below chance; only the near (F) class
+  transfers reliably, and only a minority of seeds recover the far side. So *precise* distance
+  (parity) defeats every micro model, while *coarse* distance (threshold) is **learnable
+  in-distribution but only partially generalizes across positions, mostly via the near
+  class** — and where it does generalize, position proximity (not distance alone) is part of
+  the cause. This is weaker and messier than the spec's anticipated "coarse distance survives
+  NoPE"; the honest version is "coarse distance is micro-learnable, but position
+  generalization on this split is partial and confounded." *(Seed-dependent; shortcut not
+  excluded.)*
 
 ## Caveats / limitations
 
 - **High seed variance, n=4, one fixed data split.** Seeds vary only init + batch order; the
   middle of the table (none/sinusoidal/rope/t5) is not separable at this power. Regenerating
   data per seed is the stronger protocol and the next step.
-- **The position-fade confound is real, not eliminated.** Generalizing seeds read distance
-  *and* lean on proximity to the trained region; "dist≥D generalizes" should be read as
-  "partially, with extrapolation decay", not as clean distance transfer.
+- **The position/shortcut confound is not eliminated and may drive the result.** On the
+  generalizing seeds, accuracy at a fixed distance still depends on position (proximity to the
+  trained region), and the held-out heatmaps look more block-like (position) than band-like
+  (distance). "dist≥D generalizes across positions" is therefore **not established** on this
+  split; it should be read as "partial, confounded with position." Method B (distance-held-out)
+  is the clean test.
 - **One threshold (D=5) and one split (`half`, method A).** Other D shifts class balance and
   difficulty; the distance-held-out split (method B) is a separate axis, deliberately out of
   scope here.
