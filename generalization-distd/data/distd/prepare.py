@@ -50,12 +50,11 @@ diagonal; position shortcut -> BLOCKS. (Reported in evaluate.py / plot.py output
 
 Class / distance balance:
   - 50/50 T/F in EVERY pool (enforced, not assumed).
-  - Held-out test is DISTANCE-balanced (equal examples per distance present in 10..19, i.e.
-    distances 1..9) so the accuracy-vs-separation graph has coverage. When distance balance
-    and class balance cannot both be exact, EXACT 50/50 class balance is prioritized (so
-    chance stays 50% and accuracy is interpretable); the resulting per-distance counts are
-    printed so any skew is visible. For D=5 in 10..19 it happens to be clean: distances
-    1,2,3,4 -> F (250 each), distances 5,6,7,8,9 -> T (200 each), giving exactly 1000/1000.
+  - Held-out test prioritizes exact 50/50 class balance (so chance stays interpretable) and
+    then spreads examples as evenly as possible across the distances inside each class side.
+    The resulting per-distance counts are printed so any skew is visible. For D=5 in 10..19:
+    distances 1,2,3,4 -> F (250 each), distances 5,6,7,8,9 -> T (200 each), giving exactly
+    1000/1000. This is NOT equal-count across all nine distances; exact class balance wins.
 
 Outputs (in this folder):
     train.bin / val.bin  : flat token streams, one example per line (uint16); val uses
@@ -80,7 +79,7 @@ SPLIT = 'half'
 
 N_TRAIN = 50_000       # number of training examples
 N_VAL = 5_000          # in-distribution val (monitoring during training)
-N_TEST = 2_000         # held-out test examples (distance-balanced for SPLIT='half')
+N_TEST = 2_000         # held-out test examples (class-balanced, distance-covered for half)
 # ------------------------------------------------------------------
 
 HALF = LENGTH // 2     # first half = 0..HALF-1, second half = HALF..LENGTH-1
@@ -162,16 +161,16 @@ def _split_count(total, distances):
     """Distribute `total` examples as evenly as possible across `distances`, so the sum is
     EXACTLY `total` (remainder spread one-per-distance over the first few). Returns a
     {distance: count} dict. This is what lets us force exact class balance while staying as
-    distance-balanced as the arithmetic allows."""
+    distance-covered as the arithmetic allows."""
     k = len(distances)
     base, rem = divmod(total, k)
     return {d: base + (1 if i < rem else 0) for i, d in enumerate(distances)}
 
 
 def make_distance_balanced_test(n):
-    """Held-out test pool with both X's in the second half (SPLIT='half'), distance-balanced
-    within each class and EXACTLY 50/50 T/F (class balance prioritized over distance balance
-    when they conflict).
+    """Held-out test pool with both X's in the second half (SPLIT='half'), balanced across
+    distances within each class and EXACTLY 50/50 T/F (class balance prioritized over global
+    equal-count-per-distance balance when they conflict).
 
     A contiguous region of size R has distances 1..R-1. Distances < D -> F (near), distances
     >= D -> T (far). Each class gets exactly n//2 examples, spread as evenly as possible over

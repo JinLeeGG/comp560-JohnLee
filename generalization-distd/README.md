@@ -29,7 +29,7 @@ THRESHOLD = D = 5                       (the one constant that defines this task
 LABEL MAPPING (fixed — never flip):     T  iff  DISTANCE ≥ 5 (far),  else  F (near)
 
 482X50178X4019285746:T     ← X at 3, X at 9 → distance 6 ≥ 5 → T (far)
-482X5X1786401928574 6:F    ← X at 3, X at 5 → distance 2 < 5 → F (near)
+482X5X17864019285746:F     ← X at 3, X at 5 → distance 2 < 5 → F (near)
 ```
 
 **Why two identical `X`'s (not `X` and `Y`):** distance is order-invariant, so a second
@@ -62,13 +62,13 @@ appear**:
 All pools stay 50/50 T/F (chance = 50%); `prepare.py` asserts the label mapping **and** the
 split rule on every example before writing the bins.
 
-**Distance balance in the held-out pool (required for the separation graph).** Within the
+**Distance coverage in the held-out pool (required for the separation graph).** Within the
 held-out second half (positions 10–19) distances range 1–9, and larger distances have far
-fewer position pairs (distance 9 = only the single pair `{10,19}`). The held-out test pool is
-built distance-balanced — equal examples per distance — with **exact 50/50 class balance
-prioritized** when the two can't both be exact. For `D = 5`, `N_TEST = 2000` it is clean:
-distances 1/2/3/4 → 250 each (F = 1000), distances 5/6/7/8/9 → 200 each (T = 1000).
-`prepare.py` prints the per-distance counts to confirm coverage.
+fewer position pairs (distance 9 = only the single pair `{10,19}`). The held-out test pool
+prioritizes **exact 50/50 class balance** and then balances distances within each class side.
+For `D = 5`, `N_TEST = 2000`: distances 1/2/3/4 → 250 each (F = 1000), distances 5/6/7/8/9
+→ 200 each (T = 1000). So it is not equal-count across all nine distances; `prepare.py`
+prints the per-distance counts so that skew is explicit.
 
 ---
 
@@ -101,7 +101,9 @@ reads distance.
 The learnability gate **passed**: at the micro baseline (0.80M) both `learned` and `rope`
 reach **100% in-dist val by ~iter 250** (vs even/odd's flat 50% wall). The full 5-PE × 4-seed
 sweep then shows **all 20 runs at 100% in-dist val** — so dist≥D *is* micro-learnable,
-**localizing the even/odd wall to parity's exactness, not distance-reading in general.**
+**localizing the even/odd wall to parity's exactness, not to every distance-dependent label
+being impossible at micro scale.** This is a task-level learnability result, not proof that
+the model learned an abstract position-independent distance algorithm.
 
 Generalization to held-out positions, however, is **partial and strongly seed-dependent**:
 
@@ -113,18 +115,25 @@ Generalization to held-out positions, however, is **partial and strongly seed-de
 | `rope` | relative | 100% | 55.0% | **72**/50/50/48 | 1/4 |
 | `t5` | relative | 100% | 67.5% | **85**/50/50/**85** | 2/4 |
 
-The one robust separation: **absolute `learned` (APE) never generalizes** (collapses to
+The one robust separation: **`learned` absolute PE (APE) never generalizes** (collapses to
 "near" on all 4 seeds); every other PE generalizes on ≥1 seed. But the held-out means are
 **not a ranking** at n=4 (the middle four are within noise), and what transfers across
-positions is mainly the **near** class: pooled over seeds the far (T) side stays **at/below
-chance for every distance d5–9** — only a *minority* of seeds (e.g. t5/1337, t5/1340,
-none/1339) recover the far side. Even on those seeds accuracy at a *fixed* distance depends on
-position (correct near the trained boundary, wrong deeper in), so **distance-reading vs a
-position shortcut is unresolved and leans toward the shortcut** — the per-position heatmaps
-look more block-like (position) than band-like (distance). Method B (distance-held-out) is the
-clean test. Full writeup: [log/2026-06-26-distd-pe-sweep.md](log/2026-06-26-distd-pe-sweep.md).
+positions is mainly the **near** class in the pool: pooled over seeds the far (T) side stays
+**at/below chance for every distance d5–9**. A *minority* of seeds (e.g. t5/1337, t5/1340,
+none/1339) do recover the far side, so "only near transfers" is true of the pool, not every
+run. Even on those seeds accuracy at a *fixed* distance depends on position (correct near the
+trained boundary, wrong deeper in), so **distance-with-extrapolation-decay vs position
+shortcut is unresolved** — the data cannot separate them on this split. Method B
+(distance-held-out) is the clean test. Full writeup:
+[log/2026-06-26-distd-pe-sweep.md](log/2026-06-26-distd-pe-sweep.md).
 
-<img src="log/figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: ~100% at distances 1-4, collapse at the D=5 threshold, far side stays at/below chance for all PEs in the pool; learned flat at 0" width="620">
+Bookkeeping note: the results table uses the class-balanced held-out **test set**, where
+all-"near" collapse scores 50%. The heatmap/separation figures use a position-pair-balanced
+diagnostic sweep; in the held-out 10–19 block, near pairs outnumber far pairs 2:1, so
+all-"near" collapse scores 66.7% on diagnostic-sweep aggregate accuracy. The separation plot
+is the safer diagnostic because it reports each distance separately.
+
+<img src="log/figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: near distances 1-4 solved in the pool; far side d5-9 stays at or below chance in the pool, though some individual seeds recover far" width="620">
 
 *Accuracy-vs-separation (held-out region, pooled over seeds): near distances (1–4) solved,
 then at/beyond the D=5 threshold every PE sits **at or below chance** on the far side —
@@ -234,9 +243,10 @@ on **one fixed data split** (`prepare.py` is run once). Regenerating the data pe
 ## Relation to even/odd
 
 Same distance family, one notch easier. dist≥D being micro-learnable (gate passed) while
-even/odd was not **localizes the even/odd wall to parity's exactness, not to distance-reading
-in general** — a clean contrast. (Had dist≥D *also* failed, that would have pointed at
-distance-reading itself as the micro bottleneck.)
+even/odd was not **localizes the even/odd wall to parity's exactness at the task level, not
+to every distance-dependent label being impossible under the micro budget** — a clean
+contrast. (Had dist≥D *also* failed, that would have pointed at distance-dependent labels
+being broadly too hard at this scale.)
 
 ---
 
