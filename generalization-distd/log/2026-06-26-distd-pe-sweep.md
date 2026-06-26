@@ -122,7 +122,7 @@ seed error bars. `learned` sits exactly on the chance line.*
 
 <img src="figures/accuracy_vs_separation_half.png" alt="accuracy vs separation: ~100% for distances 1-4, drops to near 0 at distance 5, rises with distance for non-learned methods; learned flat at 0 on the far side" width="640">
 
-*Accuracy vs separation (MacCormick's figure), pooled over seeds, held-out region only.
+*Accuracy vs separation, pooled over seeds, held-out region only.
 The **near** classes (distances 1–4, label F) are solved at ≈100%. At and beyond the
 threshold the curves **drop to chance or below and stay there**: every far distance (d5–9)
 sits at or under the 50% line for all methods, and `learned` is flat at 0% (always predicts
