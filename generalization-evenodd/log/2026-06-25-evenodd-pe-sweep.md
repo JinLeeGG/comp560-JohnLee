@@ -145,7 +145,7 @@ guess randomly — it answers the *same* label for everything: some seeds say T 
 (T = 100%, F = 0%), others say F to every input. Averaged together this looks like 50%, but no
 single run is ever "half right."
 
-<img src="figures/per_position_half.png" alt="per-position accuracy heatmaps for all five PEs: every sampled cell uniformly around 50%" width="640">
+<img src="figures/per_position_half.png" alt="per-position accuracy heatmaps for all five PEs: every sampled cell uniformly around 50%" width="900">
 
 **How to read it.** One heatmap per PE. A cell is the accuracy when the first `X` sits at the
 row position and the second `X` at the column position; color runs red (0%) → yellow (50%) →

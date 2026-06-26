@@ -26,6 +26,7 @@ Usage (from generalization-evenodd/):
 import os
 import csv
 import argparse
+import math
 from collections import defaultdict
 
 import numpy as np
@@ -39,6 +40,8 @@ METHOD_ORDER = ['none', 'learned', 'sinusoidal', 'rope', 't5']
 # Stable color per method, so the separation-curve lines match across regenerations.
 METHOD_COLOR = {'none': '#7570b3', 'learned': '#d95f02', 'sinusoidal': '#e7298a',
                 'rope': '#1b9e77', 't5': '#66a61e'}
+METHOD_LABEL = {'none': 'none\n(NoPE)', 'learned': 'learned\n(APE)', 'sinusoidal': 'sinusoidal',
+                'rope': 'rope', 't5': 't5'}
 LENGTH = 20
 CHANCE = 50.0
 HALF = LENGTH // 2
@@ -107,25 +110,29 @@ def plot_bars(split, out_dir, methods_filter=None, suffix=''):
     val_mean = [mean_std(grouped[m]['val'])[0] if grouped[m]['val'] else np.nan for m in methods]
     val_std = [mean_std(grouped[m]['val'])[1] if grouped[m]['val'] else 0.0 for m in methods]
 
-    fig, ax = plt.subplots(figsize=(1.8 * len(methods) + 3, 5))
+    fig, ax = plt.subplots(figsize=(1.65 * len(methods) + 3, 4.8))
     ax.bar(x - w / 2, ho_mean, w, yerr=clip_err(ho_mean, ho_std), capsize=5,
            color='#2c7fb8', label='held-out test')
     ax.bar(x + w / 2, val_mean, w, yerr=clip_err(val_mean, val_std), capsize=4,
-           color='#bdbdbd', alpha=0.7, label='in-dist. val')
+           color='#d9d9d9', alpha=0.75, label='in-dist. val')
     ax.axhline(CHANCE, ls='--', color='crimson', lw=1.3, label='chance (50%)')
 
-    for i in range(len(methods)):
+    for i, m in enumerate(methods):
+        vals = grouped[m]['heldout']
+        jitter = np.linspace(-0.055, 0.055, len(vals)) if len(vals) > 1 else [0]
+        ax.scatter([x[i] - w / 2 + j for j in jitter], vals, s=22, color='#08306b',
+                   edgecolor='white', linewidth=0.5, zorder=3)
         ax.text(x[i] - w / 2, min(ho_mean[i] + ho_std[i] + 2.5, 103),
                 f"{ho_mean[i]:.0f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
 
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{m}\n(n={nseeds[m]})" for m in methods])
+    ax.set_xticklabels([f"{METHOD_LABEL.get(m, m)}\n(n={nseeds[m]})" for m in methods])
     ax.set_ylim(0, 105)
     ax.set_ylabel('accuracy (%)')
     ax.set_xlabel('positional encoding')
-    ax.set_title(f'Even/odd separation — held-out generalization by PE — {split} split\n'
-                 f'(high val + low held-out = learned the task but did not generalize)',
-                 fontsize=11)
+    ax.set_title(f'Even/odd separation — held-out generalization ({split} split)\n'
+                 f'gray = in-distribution val; blue dots = held-out seeds', fontsize=11)
+    ax.grid(axis='y', alpha=0.25)
     ax.legend(loc='lower left')
     fig.tight_layout()
     p1 = os.path.join(out_dir, f'heldout_accuracy_{split}{suffix}.png')
@@ -137,7 +144,7 @@ def plot_bars(split, out_dir, methods_filter=None, suffix=''):
     # If a model collapses to a single label, per-class accuracy exposes it (one class ->
     # ~100%, the other -> ~0%). The collapse direction can be seed-dependent, so overlay
     # each seed as a dot.
-    fig, ax = plt.subplots(figsize=(1.8 * len(methods) + 3, 5))
+    fig, ax = plt.subplots(figsize=(1.65 * len(methods) + 3, 4.8))
     t_vals = [grouped[m]['T'] for m in methods]
     f_vals = [grouped[m]['F'] for m in methods]
     t_mean = [mean_std(v)[0] for v in t_vals]
@@ -153,15 +160,15 @@ def plot_bars(split, out_dir, methods_filter=None, suffix=''):
                    label='per seed' if xi == x[0] else None)
         ax.scatter([xi + w / 2] * len(fv), fv, color='#7f2704', s=22, zorder=3)
     ax.axhline(CHANCE, ls='--', color='crimson', lw=1.3, label='chance (50%)')
-    ax.set_xticks(x); ax.set_xticklabels(methods)
+    ax.set_xticks(x); ax.set_xticklabels([METHOD_LABEL.get(m, m) for m in methods])
     ax.set_ylim(0, 105)
     ax.set_ylabel('held-out accuracy (%)')
-    ax.set_xlabel('positional encoding')
-    ax.set_title(f'Even/odd separation — per-class held-out accuracy — {split} split\n'
-                 f'(dots = seeds; a class at the 0/100 extremes = collapse to one label)',
-                 fontsize=11)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=4, fontsize=8)
-    fig.tight_layout()
+    ax.set_xlabel('')
+    ax.set_title(f'Even/odd separation — per-class held-out accuracy ({split} split)\n'
+                 f'dots = seeds; 0/100 split = collapse to one label', fontsize=11)
+    ax.grid(axis='y', alpha=0.25)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=4, fontsize=8)
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
     p2 = os.path.join(out_dir, f'heldout_perclass_{split}{suffix}.png')
     fig.savefig(p2, dpi=150)
     plt.close(fig)
@@ -203,12 +210,15 @@ def plot_per_position(split, out_dir, methods_filter=None, suffix=''):
     if methods_filter:
         methods = [m for m in methods if m in methods_filter]
 
-    fig, axes = plt.subplots(1, len(methods), figsize=(4.8 * len(methods) + 1.6, 5.0),
+    ncols = min(3, len(methods))
+    nrows = math.ceil(len(methods) / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.15 * ncols + 1.0, 4.05 * nrows),
                              squeeze=False, constrained_layout=True)
     cmap = plt.get_cmap('RdYlGn').copy()
     cmap.set_bad('lightgray')
     im = None
-    for ax, m in zip(axes[0], methods):
+    flat_axes = axes.ravel()
+    for ax, m in zip(flat_axes, methods):
         grid = np.full((LENGTH, LENGTH), np.nan)        # rows = X1 (smaller), cols = X2 (larger)
         for x1 in range(LENGTH):
             for x2 in range(LENGTH):
@@ -222,10 +232,13 @@ def plot_per_position(split, out_dir, methods_filter=None, suffix=''):
         ax.set_ylabel('X1 position (smaller)')
         ax.set_xticks(range(0, LENGTH, 2))
         ax.set_yticks(range(0, LENGTH, 2))
-    fig.suptitle(f'Even/odd separation — per-position accuracy over the diagnostic sweep — '
-                 f'{split} split\n(cell = accuracy with X at row & X at col; distance = '
-                 f'col - row; gray = X1>=X2, not sampled)', fontsize=12)
-    cbar = fig.colorbar(im, ax=axes[0].tolist(), fraction=0.046, pad=0.03)
+        ax.tick_params(labelsize=8)
+    for ax in flat_axes[len(methods):]:
+        ax.axis('off')
+    fig.suptitle(f'Even/odd separation — per-position diagnostic sweep ({split} split, pooled over seeds)\n'
+                 f'cell = accuracy for X at row/col; green = correct, red = wrong, gray = X1>=X2',
+                 fontsize=12)
+    cbar = fig.colorbar(im, ax=flat_axes[:len(methods)].tolist(), fraction=0.035, pad=0.02)
     cbar.set_label('accuracy')
     p = os.path.join(out_dir, f'per_position_{split}{suffix}.png')
     fig.savefig(p, dpi=150)
@@ -263,29 +276,29 @@ def plot_separation(split, out_dir, methods_filter=None, suffix=''):
     if methods_filter:
         methods = [m for m in methods if m in methods_filter]
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(8.8, 5.2))
+    all_d = sorted({int(r['distance']) for r in held})
+    for d in all_d:
+        if d % 2 == 0:
+            ax.axvspan(d - 0.5, d + 0.5, color='#e5f5e0', alpha=0.5, zorder=0)
+        else:
+            ax.axvspan(d - 0.5, d + 0.5, color='#fee0d2', alpha=0.42, zorder=0)
     for m in methods:
         dists = sorted(d for (mm, d) in acc_cnt if mm == m)
         ys = [100 * acc_sum[(m, d)] / acc_cnt[(m, d)] for d in dists]
-        ns = [acc_cnt[(m, d)] for d in dists]
-        ax.plot(dists, ys, marker='o', color=METHOD_COLOR.get(m), label=m)
-        # annotate the sample count per distance once, faintly, on the first method
-        if m == methods[0]:
-            for d, n in zip(dists, ns):
-                ax.annotate(f'n={n}', (d, -7), ha='center', va='center', fontsize=7,
-                            color='gray', annotation_clip=False)
+        ax.plot(dists, ys, marker='o', lw=2.0, ms=5.5, color=METHOD_COLOR.get(m), label=m)
 
     ax.axhline(CHANCE, ls='--', color='crimson', lw=1.3, label='chance (50%)')
-    all_d = sorted({int(r['distance']) for r in held})
     ax.set_xticks(all_d)
     ax.set_ylim(0, 105)
-    ax.set_xlabel('separation |X2 - X1|  (held-out region: both X in 10..19)')
+    ax.set_xlim(min(all_d) - 0.5, max(all_d) + 0.5)
+    ax.set_xlabel('separation |X2 - X1|  (held-out block: both X in 10..19)')
     ax.set_ylabel('mean accuracy (%)')
-    ax.set_title(f'Even/odd separation — accuracy vs separation — {split} split\n'
-                 f'(held-out block of the heatmap collapsed along the diagonal; '
-                 f'even distance -> T, odd -> F)', fontsize=11)
-    ax.legend(loc='lower left', ncol=2, fontsize=9)
-    ax.grid(True, alpha=0.3)
+    ax.set_title(f'Even/odd separation — accuracy by separation ({split} split)\n'
+                 f'pooled over seeds; green bands = even/T, peach bands = odd/F',
+                 fontsize=11)
+    ax.legend(loc='center left', bbox_to_anchor=(1.01, 0.5), fontsize=9)
+    ax.grid(axis='y', alpha=0.3)
     fig.tight_layout()
     p = os.path.join(out_dir, f'accuracy_vs_separation_{split}{suffix}.png')
     fig.savefig(p, dpi=150)
