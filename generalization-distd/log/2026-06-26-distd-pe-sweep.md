@@ -2,7 +2,7 @@
 
 *2026-06-26 · commit `<pending>` · John Lee*
 
-> **Bottom line.**
+> **Main takeaway.**
 >
 > 1. A micro-transformer (<1M params) **learns dist≥5 perfectly in-distribution** — all 20
 >    runs (5 PE × 4 seeds) reach **100% val**. This **clears the even/odd capacity wall**:

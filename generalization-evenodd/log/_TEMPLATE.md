@@ -16,7 +16,7 @@ Delete these comments when you fill the file in.
 
 *YYYY-MM-DD · commit `<short-sha>` · John Lee*
 
-> **Bottom line.** <the 3-second conclusion in one or two sentences.>
+> **Main takeaway.** <the 3-second conclusion in one or two sentences.>
 
 ### The task
 

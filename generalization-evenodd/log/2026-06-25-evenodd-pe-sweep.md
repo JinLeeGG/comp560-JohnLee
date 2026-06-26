@@ -2,7 +2,7 @@
 
 *2026-06-25 · commit `<pending>` · John Lee*
 
-> **Bottom line.**
+> **Main takeaway.**
 >
 > 1. A micro-transformer (<1M params) **cannot learn even/odd distance-parity at all** —
 >    every PE, every seed sits at exactly 50% on *in-distribution* val (loss locked at
