@@ -46,6 +46,22 @@ Two ablations were run:
 2. **T5 mask-only diagnostic:** `causal=False`, but `t5_bias_mode=causal`, so attention is
    unmasked while T5 keeps the original causal/unidirectional bucket scheme.
 
+**Why T5 needs two conditions (and the others don't).** For `none`/`learned`/`sinusoidal`/`rope`,
+"remove the causal mask" is unambiguous: the PE is independent of the mask, so you just stop
+applying it. T5 is the exception — its relative-position *bias* is a learned lookup over a
+**direction-aware bucketing scheme**, which comes in two standard forms:
+
+- **unidirectional (decoder) buckets:** only keys at or before the query get distinct buckets;
+  future keys are clamped into one bucket (a decoder masks them anyway, so they never matter).
+- **bidirectional (encoder) buckets:** the bucket range is split so past (`-d`) and future (`+d`)
+  offsets learn *separate* biases.
+
+So "non-causal T5" is really a second decision — which bucket convention to use — and flipping to a
+fully bidirectional T5 changes **two things at once**: the mask is off *and* the bucket scheme
+changed. That confound is exactly why there are two conditions. The **mask-only** condition holds
+the bucket scheme fixed (causal buckets) while turning the mask off, so it isolates the effect of
+the mask from the effect of the bucket-scheme change.
+
 Reproduce:
 
 ```bash
@@ -148,6 +164,19 @@ For `rope`, F (near, 87.3%) transfers better than T (far, 73.1%), i.e. the far s
 
 ### T5 diagnostic
 
+The three rows below are a 2-factor decomposition — read top to bottom to attribute T5's failure
+to the right cause. Each row toggles one thing relative to the one above:
+
+- **causal baseline** (mask on, causal buckets): learns, partly generalizes (the 2026-06-26 result).
+- **bidirectional bucket** (mask off, bidirectional buckets): the "fair" bidirectional T5, the
+  direct analog of bidirectional RoPE — but it does not even learn in-distribution.
+- **mask-only** (mask off, causal buckets): learning returns on 3/4 seeds, yet held-out still fails.
+
+The split is informative: the **learnability** collapse tracks the **bucket-scheme** change
+(mask-only keeps learnability; the fully bidirectional buckets lose it), while the
+**generalization** failure is independent of the mask (mask-only restores learning but still
+does not generalize).
+
 Raw files (same convention as above):
 
 - `results_t5_maskonly_20260630-055048.csv` (committed)
@@ -182,11 +211,12 @@ Raw files (same convention as above):
    but remains near/below chance on the held-out half. Causal mask removal does not fix the
    absolute-position shortcut.
 
-4. **T5 splits into two issues.** Fully bidirectional T5 buckets make this configuration fail
-   the in-distribution learnability gate. Keeping causal T5 buckets while removing the mask
-   restores learnability for 3/4 seeds, but held-out accuracy remains at chance or worse.
-   So the T5 learnability failure is largely tied to the bidirectional bucket change, while
-   the T5 generalization failure remains even in the mask-only diagnostic.
+4. **T5's two failures have different causes.** As the diagnostic decomposition above shows, the
+   *learnability* collapse is driven by the bucket-scheme switch (learning returns once causal
+   buckets are kept), while the *generalization* failure survives even the mask-only condition.
+   The upshot: removing the mask neither breaks T5 on its own nor fixes its generalization — both
+   T5 problems live in the learned relative-bias representation, not in the attention mask. This
+   is the opposite of RoPE, where removing the mask was the single change that helped.
 
 **Hypothesis.** RoPE works better here because relative position is built directly into the
 query/key geometry. T5 bias is a learned scalar routing term added to attention logits; with
