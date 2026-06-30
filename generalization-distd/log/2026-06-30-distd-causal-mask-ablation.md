@@ -11,6 +11,8 @@
 > bucket scheme fails the in-distribution learnability gate, while a mask-only T5 diagnostic
 > can learn in-distribution on some seeds but still fails held-out generalization.
 
+---
+
 ### The task
 
 Same fixed-length distance-threshold task as the 2026-06-26 sweep. A length-20 string
@@ -126,6 +128,8 @@ before/after on generalization — and among those, only `rope` moved (the other
 or failing). `none` and `t5` are not comparable here: removing the mask broke their learning, not
 (yet) their generalization.
 
+---
+
 ### Full bidirectional sweep (detailed)
 
 Raw files (committed: the small aggregate CSV + the figures copied under `figures/2026-06-30/`;
@@ -161,6 +165,8 @@ For `rope`, F (near, 87.3%) transfers better than T (far, 73.1%), i.e. the far s
 <img src="figures/2026-06-30/bidir_per_position_half.png" alt="Bidirectional per-position held-out heatmap by PE; read this before claiming distance-reading vs position shortcut for RoPE" width="900">
 
 *Per-position held-out accuracy (held-out block, both `X`s at positions ≥10). Read this before claiming RoPE reads distance: clean distance bands = real extrapolation; accuracy that tracks position instead = a shortcut.*
+
+---
 
 ### T5 diagnostic
 
@@ -223,6 +229,8 @@ query/key geometry. T5 bias is a learned scalar routing term added to attention 
 answer-token-only supervision and unmasked attention, it may be harder to learn the routing
 needed for distance, especially when the bucket scheme changes.
 
+---
+
 ## Caveats
 
 - n=4 seeds, one fixed data split.
@@ -231,6 +239,8 @@ needed for distance, especially when the bucket scheme changes.
   scheme.
 - The held-out heatmaps still need careful reading before claiming true distance
   extrapolation rather than a position shortcut.
+
+---
 
 ## Next
 
