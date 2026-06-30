@@ -23,6 +23,8 @@ log_interval = 100
 # positions) methods hold up. BUT dist>=D is coarse, so NoPE may also approximate it; that
 # would itself be a finding (coarse distance survives NoPE, precise distance/parity does not).
 pos_type = 'learned'   # 'none' | 'learned' | 'sinusoidal' | 'rope' | 't5'
+causal = True          # True = decoder mask; False = bidirectional attention ablation
+t5_bias_mode = 'auto'  # 'auto' follows causal; use 'causal' for mask-only T5 ablation
 
 # --- model (kept at the Phase-0 baseline size, ~0.8M params) ---
 n_layer = 4

@@ -20,6 +20,7 @@ log_interval = 100
 # the relative-order result where NoPE generalized. Distance-aware ('rope','t5') and
 # absolute ('learned','sinusoidal', which can subtract positions) methods may hold up.
 pos_type = 'learned'   # 'none' | 'learned' | 'sinusoidal' | 'rope' | 't5'
+causal = True          # True = decoder mask; False = bidirectional attention ablation
 
 # --- model (kept at the Phase-0 baseline size, ~0.8M params) ---
 n_layer = 4

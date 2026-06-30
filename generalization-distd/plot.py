@@ -50,6 +50,8 @@ LENGTH = 20
 CHANCE = 50.0
 HALF = LENGTH // 2
 D = 5            # dist>=D threshold (cosmetic only here: threshold line + axis labels)
+RESULTS_CSV = 'results.csv'
+PREDICTIONS_CSV = 'predictions.csv'
 
 
 def read_csv(path):
@@ -88,9 +90,9 @@ def clip_err(means, stds):
 
 # ----------------------------- bar charts (from results.csv) -----------------------------
 def plot_bars(split, out_dir, methods_filter=None, suffix=''):
-    rows = [r for r in read_csv('results.csv') if r['split'] == split]
+    rows = [r for r in read_csv(RESULTS_CSV) if r['split'] == split]
     if not rows:
-        print(f"[bars] no results.csv rows for split={split}; skipping")
+        print(f"[bars] no {RESULTS_CSV} rows for split={split}; skipping")
         return
     rows = latest_per_key(rows, ['pos_type', 'split', 'seed'])
 
@@ -197,9 +199,9 @@ def annotate_regions(ax, split):
 
 
 def plot_per_position(split, out_dir, methods_filter=None, suffix=''):
-    rows = [r for r in read_csv('predictions.csv') if r['split'] == split]
+    rows = [r for r in read_csv(PREDICTIONS_CSV) if r['split'] == split]
     if not rows:
-        print(f"[heatmap] no predictions.csv rows for split={split}; skipping")
+        print(f"[heatmap] no {PREDICTIONS_CSV} rows for split={split}; skipping")
         return
 
     # accumulate correct-sum and count per (pos_type, x1_pos, x2_pos), pooled over seeds
@@ -258,9 +260,9 @@ def plot_separation(split, out_dir, methods_filter=None, suffix=''):
     accuracy against distance, one line per method. This is literally the held-out block of
     the per-position heatmap collapsed along the diagonal (equal-distance cells averaged).
     The threshold D is marked: distances < D should be F (near), >= D should be T (far)."""
-    rows = [r for r in read_csv('predictions.csv') if r['split'] == split]
+    rows = [r for r in read_csv(PREDICTIONS_CSV) if r['split'] == split]
     if not rows:
-        print(f"[separation] no predictions.csv rows for split={split}; skipping")
+        print(f"[separation] no {PREDICTIONS_CSV} rows for split={split}; skipping")
         return
 
     # held-out region of the half split: both X's at positions >= HALF
@@ -326,7 +328,11 @@ if __name__ == '__main__':
                     help="comma-separated subset, e.g. none,rope (default: all present). "
                          "A subset appends '_<methods>' to the output filenames.")
     ap.add_argument('--out_dir', default='out')
+    ap.add_argument('--results_csv', default='results.csv')
+    ap.add_argument('--predictions_csv', default='predictions.csv')
     args = ap.parse_args()
+    RESULTS_CSV = args.results_csv
+    PREDICTIONS_CSV = args.predictions_csv
     os.makedirs(args.out_dir, exist_ok=True)
     methods_filter = [m.strip() for m in args.methods.split(',') if m.strip()] or None
     suffix = '' if not methods_filter else '_' + '-'.join(methods_filter)

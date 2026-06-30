@@ -9,7 +9,10 @@ venv/
 .env
 *.bin
 meta.pkl
-out/
+# working run dirs: 'out/' plus timestamped sweep dirs like out_bidir_<pe>_<seed>_<ts>/
+# and out_*_figures_*/. Checkpoints are large and fully regenerable by train.py; the figures
+# a log shows are copied into <task>/log/figures/ and committed there instead.
+out*/
 .vscode/
 wandb/
 CLAUDE.md

@@ -1,0 +1,5 @@
+timestamp,pos_type,split,split_detail,seed,val_acc,heldout_acc,heldout_T_acc,heldout_F_acc
+2026-06-30T05:57:11,t5,half,first->second,1337,0.500000,0.500000,1.000000,0.000000
+2026-06-30T06:01:33,t5,half,first->second,1338,1.000000,0.500000,0.000000,1.000000
+2026-06-30T06:05:41,t5,half,first->second,1339,0.913200,0.494000,0.988000,0.000000
+2026-06-30T06:11:47,t5,half,first->second,1340,1.000000,0.290000,0.483000,0.097000

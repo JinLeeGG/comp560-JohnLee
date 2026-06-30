@@ -17,6 +17,7 @@ log_interval = 100
 # Relative order DEPENDS ON POSITION, so 'none' should sit near chance (50%) and
 # 'learned' should solve it -- that contrast is the meeting story.
 pos_type = 'learned'   # 'none' | 'learned' | 'sinusoidal' | 'rope' | 't5'
+causal = True          # True = decoder mask; False = bidirectional attention ablation
 
 # --- model (kept at the Phase-0 baseline size, ~0.8M params) ---
 n_layer = 4

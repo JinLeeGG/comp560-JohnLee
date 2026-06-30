@@ -133,25 +133,41 @@ class T5RelativeBias(PositionalEncoding):
     """T5 relative position bias (Raffel et al. 2020): a learned scalar bias per
     (head, bucketed relative distance), added to the attention logits at Branch C.
 
-    Bucketing is the standard T5 scheme in its UNIDIRECTIONAL (causal/decoder) form: only
-    keys at or before the query carry a bias; nearby offsets get their own bucket, far
-    offsets share log-spaced buckets. An nn.Embedding(num_buckets, n_head) maps each bucket
-    to a per-head scalar, producing an (n_head, T, T) bias.
+    Bucketing uses the standard T5 scheme. In causal/decoder mode, only keys at or before
+    the query receive distinct buckets. In bidirectional mode, half of the buckets are
+    assigned to keys at/before the query and half to keys after the query. Nearby offsets
+    get exact buckets; far offsets share log-spaced buckets. An nn.Embedding(num_buckets,
+    n_head) maps each bucket to a per-head scalar, producing an (n_head, T, T) bias.
     """
 
-    def __init__(self, n_head, block_size, num_buckets=32, max_distance=128):
+    def __init__(self, n_head, block_size, num_buckets=32, max_distance=128, causal=True):
         super().__init__()
+        if not causal:
+            assert num_buckets % 2 == 0, "bidirectional T5 bias needs an even number of buckets"
         self.n_head = n_head
         self.block_size = block_size
         self.num_buckets = num_buckets
         self.max_distance = max_distance
+        self.causal = causal
         self.rel_bias = nn.Embedding(num_buckets, n_head)                           # learned (bucket -> per-head bias)
 
     @staticmethod
-    def _bucket(relative_position, num_buckets, max_distance):
-        """relative_position = key_index - query_index (<= 0 for valid causal pairs).
-        Returns a bucket id in [0, num_buckets). Unidirectional (decoder) scheme."""
-        rp = -torch.clamp(relative_position, max=0)                                 # >= 0 distance back to the key
+    def _bucket(relative_position, num_buckets, max_distance, causal):
+        """relative_position = key_index - query_index.
+
+        Causal mode keeps the original decoder-style T5 scheme: positive relative
+        positions are clamped to zero because future keys are masked out anyway.
+        Bidirectional mode splits the bucket range by direction, so +d and -d can learn
+        different scalar biases.
+        """
+        if causal:
+            rp = -torch.clamp(relative_position, max=0)                             # >= 0 distance back to the key
+        else:
+            half = num_buckets // 2
+            direction = (relative_position > 0).long() * half                      # right/future keys use upper half
+            rp = relative_position.abs()
+            num_buckets = half
+
         max_exact = num_buckets // 2
         is_small = rp < max_exact                                                   # exact buckets for near offsets
         large = max_exact + (
@@ -159,18 +175,21 @@ class T5RelativeBias(PositionalEncoding):
             / math.log(max_distance / max_exact) * (num_buckets - max_exact)
         ).long()
         large = torch.minimum(large, torch.full_like(large, num_buckets - 1))       # clamp far offsets
-        return torch.where(is_small, rp, large)
+        buckets = torch.where(is_small, rp, large)
+        if not causal:
+            buckets = buckets + direction
+        return buckets
 
     def attention_bias(self, T, device):
         q_pos = torch.arange(T, device=device)[:, None]                            # (T, 1) query index
         k_pos = torch.arange(T, device=device)[None, :]                            # (1, T) key index
         rel = k_pos - q_pos                                                         # (T, T) = key - query
-        buckets = self._bucket(rel, self.num_buckets, self.max_distance)           # (T, T)
+        buckets = self._bucket(rel, self.num_buckets, self.max_distance, self.causal)  # (T, T)
         bias = self.rel_bias(buckets)                                               # (T, T, n_head)
         return bias.permute(2, 0, 1).unsqueeze(0)                                   # (1, n_head, T, T)
 
 
-def build_positional_encoding(pos_type, *, block_size, n_embd, n_head):
+def build_positional_encoding(pos_type, *, block_size, n_embd, n_head, causal=True):
     """Single dispatch point: map a pos_type string to its PE module."""
     if pos_type == 'none':
         return NoPE()
@@ -181,6 +200,6 @@ def build_positional_encoding(pos_type, *, block_size, n_embd, n_head):
     if pos_type == 'rope':
         return RoPE(n_head, n_embd, block_size)
     if pos_type == 't5':
-        return T5RelativeBias(n_head, block_size)
+        return T5RelativeBias(n_head, block_size, causal=causal)
     raise ValueError(
         f"unknown pos_type {pos_type!r}; expected one of: none, learned, sinusoidal, rope, t5")

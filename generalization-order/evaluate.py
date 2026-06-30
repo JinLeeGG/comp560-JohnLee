@@ -87,6 +87,7 @@ model.load_state_dict(checkpoint['model'])
 model.eval()
 model.to(device)
 pos_type = checkpoint['model_args'].get('pos_type')
+causal = checkpoint['model_args'].get('causal', True)
 train_seed = checkpoint.get('seed', seed)     # authoritative seed = the one trained with
 val_acc = checkpoint.get('val_acc')           # in-distribution val accuracy (overall)
 
@@ -133,7 +134,7 @@ heldout_F_acc = cF / tF if tF else 0.0
 # report
 print("=== Relative-order Evaluation ===")
 print(f"test_file: {test_file}")
-print(f"pos_type : {pos_type} | split: {split} ({split_detail}) | seed: {train_seed}")
+print(f"pos_type : {pos_type} | causal: {causal} | split: {split} ({split_detail}) | seed: {train_seed}")
 print(f"val acc  : {val_acc:.2%}" if val_acc is not None else "val acc  : (not in ckpt)")
 print(f"examples : {total}   (chance = 50%)")
 if tT:
@@ -181,6 +182,11 @@ def build_sweep(per_pair, length, sweep_seed=0):
 
 
 if log_results:
+    if not causal and (results_csv, predictions_csv) == ('results.csv', 'predictions.csv'):
+        print("\nwarning: causal=False results are being logged to the default CSV names; "
+              "use --results_csv=results_bidir.csv --predictions_csv=predictions_bidir.csv "
+              "to keep them separate from the causal baseline.")
+
     # 1) aggregate row -> results.csv
     append_csv(
         results_csv,

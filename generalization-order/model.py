@@ -32,6 +32,7 @@ class MicroTransformerConfig:
     dropout: float = 0.0
     bias: bool = True               # bias in Linear/LayerNorm layers
     pos_type: str = 'learned'       # 'none' | 'learned' | 'sinusoidal' | 'rope' | 't5'
+    causal: bool = True             # True = decoder mask; False = bidirectional attention
 
 
 class CausalSelfAttention(nn.Module):
@@ -45,6 +46,7 @@ class CausalSelfAttention(nn.Module):
         self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
+        self.causal = config.causal
         # The PE module is owned and registered by the parent MicroTransformer. We keep a
         # NON-registered reference here (wrapped in a tuple so nn.Module doesn't register
         # it as a submodule) -- otherwise a parametric PE like learned-absolute would be
@@ -75,7 +77,8 @@ class CausalSelfAttention(nn.Module):
         bias = self.pe.attention_bias(T, x.device)                     # Branch C (t5)
         if bias is not None:
             att = att + bias
-        att = att.masked_fill(self.causal_mask[:, :, :T, :T] == 0, float('-inf'))
+        if self.causal:
+            att = att.masked_fill(self.causal_mask[:, :, :T, :T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
         att = self.attn_dropout(att)
         y = att @ v                                                    # (B, n_head, T, head_dim)
@@ -120,7 +123,7 @@ class MicroTransformer(nn.Module):
         # appear exactly once in the state_dict.
         self.pe = build_positional_encoding(
             config.pos_type, block_size=config.block_size,
-            n_embd=config.n_embd, n_head=config.n_head)
+            n_embd=config.n_embd, n_head=config.n_head, causal=config.causal)
         self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)
         self.drop = nn.Dropout(config.dropout)
         self.blocks = nn.ModuleList(

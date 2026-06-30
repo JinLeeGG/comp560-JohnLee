@@ -45,6 +45,7 @@ block_size = 64
 dropout = 0.0
 bias = True
 pos_type = 'learned'
+causal = True
 
 # optimizer / schedule (in line with the previous nanoGPT config)
 batch_size = 64
@@ -125,10 +126,11 @@ def get_batch():
 
 # ------------------------------- model ------------------------------
 model_args = dict(vocab_size=vocab_size, block_size=block_size, n_layer=n_layer,
-                  n_head=n_head, n_embd=n_embd, dropout=dropout, bias=bias, pos_type=pos_type)
+                  n_head=n_head, n_embd=n_embd, dropout=dropout, bias=bias,
+                  pos_type=pos_type, causal=causal)
 model = MicroTransformer(MicroTransformerConfig(**model_args))
 model.to(device)
-print(f"model: pos_type={pos_type} | {model.num_params()/1e6:.2f}M params")
+print(f"model: pos_type={pos_type} | causal={causal} | {model.num_params()/1e6:.2f}M params")
 
 # AdamW with the usual decay / no-decay split (no weight decay on biases & LayerNorm).
 decay = [p for p in model.parameters() if p.dim() >= 2]
