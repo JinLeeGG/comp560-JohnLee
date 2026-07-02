@@ -137,8 +137,8 @@ For with-colon input, `block_size=7`, so T5 has:
 13 buckets * 2 heads = 26 scalar bias parameters
 ```
 
-This is the advisor-requested simple version: one exact bucket for every relative
-distance. It does not use standard T5's logarithmic bucketing.
+This follows the meeting note: "individual bucket for every offset, not logarithmic."
+In code, every relative offset gets its own learned bucket.
 
 ## Caveats
 
