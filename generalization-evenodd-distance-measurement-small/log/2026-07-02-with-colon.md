@@ -110,12 +110,25 @@ but usually falls to chance on held-out positions.
 
 ## T5 Implementation Note
 
-This is not full T5. It only adds a T5-style relative attention bias.
+This is not full T5. The only T5-style change is a **relative attention bias**.
 
-Code:
+What changed:
 
-- `pos_encoding.py`: `T5RelativeBias`
-- `model.py`: attention adds the bias to attention scores
+- No absolute position embedding is added.
+- Q/K/V, MLP, classifier head, and training loop are unchanged.
+- Attention gets one learned bias value based on relative distance:
+
+```text
+relative_position = key_index - query_index
+bucket = relative_position + (block_size - 1)
+attention_score += learned_bias[bucket, head]
+```
+
+Where to find it:
+
+- `pos_encoding.py`, lines 132-158: `T5RelativeBias`
+- `pos_encoding.py`, lines 161-172: `pos_type == 't5'` creates `T5RelativeBias`
+- `model.py`, lines 69-73: attention computes scores, gets the bias, and adds it
 
 For with-colon input, `block_size=7`, so T5 has:
 
@@ -123,6 +136,9 @@ For with-colon input, `block_size=7`, so T5 has:
 2 * 7 - 1 = 13 relative-distance buckets
 13 buckets * 2 heads = 26 scalar bias parameters
 ```
+
+This is the advisor-requested simple version: one exact bucket for every relative
+distance. It does not use standard T5's logarithmic bucketing.
 
 ## Caveats
 
