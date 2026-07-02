@@ -1,0 +1,132 @@
+# Small Even/Odd Distance Measurement Task - With Colon
+
+*2026-07-02 - John Lee*
+
+## Config
+
+This is the same task as no-colon, but the model also sees a fixed final `:` token.
+
+| item | value |
+|---|---|
+| directory | `generalization-evenodd-distance-measurement-small/` |
+| config | `config/with_colon.py` |
+| input | six tokens plus final `:` |
+| task | decide whether the X/Y distance is even or odd |
+| train/val positions | `X` and `Y` only in `0,1,2` |
+| held-out positions | `X` and `Y` only in `3,4,5` |
+| labels | `T` = even distance, `F` = odd distance |
+| model | 3 layers, 2 heads, 32 dim, about 0.04M params |
+| mask | `causal=False` |
+| seeds | `1337`, `2024`, `31415`, `27182` |
+| PEs | `none`, `learned`, `sinusoidal`, `rope`, `t5` |
+
+## Commands
+
+```bash
+cd generalization-evenodd-distance-measurement-small
+../venv/bin/python data/evenodd_distance/prepare.py
+
+for seed in 1337 2024 31415 27182; do
+  for pe in none learned sinusoidal rope t5; do
+    ../venv/bin/python train.py config/with_colon.py --seed=$seed --pos_type=$pe
+    ../venv/bin/python evaluate.py config/with_colon.py \
+      --results_csv=results_with_colon.csv \
+      --predictions_csv=predictions_with_colon.csv \
+      --show_errors=0
+  done
+done
+
+../venv/bin/python plot_latest_commit_style.py --split=half \
+  --results_csv=results_with_colon_lateststyle.csv \
+  --predictions_csv=predictions_with_colon_lateststyle.csv \
+  --out_dir=log/figures/with_colon
+```
+
+## Task
+
+The label is still based only on the distance between `X` and `Y`.
+
+```text
+T iff abs(index(X) - index(Y)) is even
+F iff abs(index(X) - index(Y)) is odd
+```
+
+Example:
+
+```text
+stored example: XOYOOO:T
+model input:    XOYOOO:
+X at 0, Y at 2 -> distance 2 -> even -> T
+```
+
+The final `:` is visible to the model, but it is **not** part of the distance.
+
+## Hypothesis
+
+| PE | expected result | why |
+|---|---|---|
+| `none` | fail | no position information |
+| `learned` | learn train, fail held-out | can memorize seen positions |
+| `sinusoidal` | learn train, fail held-out | still uses absolute positions |
+| `rope` | generalize | X/Y distance should still be available |
+| `t5` | uncertain | relative distances help, but `:` may create a shortcut |
+
+## Results
+
+Mean +/- standard deviation over 4 seeds. Chance is 50%.
+
+| PE | val | held-out | held-out by seed |
+|---|---:|---:|---|
+| `none` | 50.0 +/- 0.0 | 50.0 +/- 0.0 | 50, 50, 50, 50 |
+| `learned` | 100.0 +/- 0.0 | 50.0 +/- 0.0 | 50, 50, 50, 50 |
+| `sinusoidal` | 100.0 +/- 0.0 | 50.0 +/- 0.0 | 50, 50, 50, 50 |
+| `rope` | 100.0 +/- 0.0 | 100.0 +/- 0.0 | 100, 100, 100, 100 |
+| `t5` | 100.0 +/- 0.0 | 56.2 +/- 10.8 | 50, 75, 50, 50 |
+
+<img src="figures/with_colon/heldout_accuracy_half.png" alt="with-colon held-out accuracy by PE" width="680">
+
+<img src="figures/with_colon/heldout_perclass_half.png" alt="with-colon per-class held-out accuracy by PE" width="680">
+
+<img src="figures/with_colon/per_position_half.png" alt="with-colon per-position accuracy heatmaps" width="900">
+
+## Main Takeaway
+
+Adding `:` changes simplified T5, but not RoPE.
+
+- RoPE stays at 100% held-out accuracy.
+- T5 learns the train positions, but held-out accuracy drops to `56.2 +/- 10.8`.
+- Learned and sinusoidal still fail held-out generalization.
+- NoPE still does not learn.
+
+## Interpretation
+
+The final `:` gives the model a fixed marker. A position in `0,1,2` has a different
+distance to `:` than a position in `3,4,5`.
+
+RoPE still learns the X/Y distance rule and transfers it.
+
+Simplified T5 may be using the final `:` as a shortcut. It gets 100% validation accuracy,
+but usually falls to chance on held-out positions.
+
+## T5 Implementation Note
+
+This is not full T5. It only adds a T5-style relative attention bias.
+
+Code:
+
+- `pos_encoding.py`: `T5RelativeBias`
+- `model.py`: attention adds the bias to attention scores
+
+For with-colon input, `block_size=7`, so T5 has:
+
+```text
+2 * 7 - 1 = 13 relative-distance buckets
+13 buckets * 2 heads = 26 scalar bias parameters
+```
+
+## Caveats
+
+- Tiny sanity check only.
+- One split only: `0,1,2 -> 3,4,5`.
+- Inside each half, only distances 1 and 2 occur.
+- Simplified T5 relative bias, not full T5.

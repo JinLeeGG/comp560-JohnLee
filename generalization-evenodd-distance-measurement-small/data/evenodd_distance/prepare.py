@@ -1,8 +1,8 @@
 """
-Tiny relative-order sanity dataset.
+Small X/Y even/odd distance measurement sanity dataset.
 
 Task: fixed-length string with one X and one Y, padded by O. Output:
-    T iff index(X) < index(Y), else F.
+    T iff abs(index(X) - index(Y)) is even, else F.
 
 This is the smallest version of the advisor's 6/30 suggestion:
     - LENGTH = 6
@@ -48,18 +48,30 @@ def ordered_pairs(positions):
     return [(xp, yp) for xp in positions for yp in positions if xp != yp]
 
 
+def label_for(xp, yp):
+    return 'T' if abs(xp - yp) % 2 == 0 else 'F'
+
+
 def make_example(xp, yp):
     chars = ['O'] * LENGTH
     chars[xp] = 'X'
     chars[yp] = 'Y'
-    label = 'T' if xp < yp else 'F'
+    label = label_for(xp, yp)
     return ''.join(chars) + ':' + label
 
 
 def make_pool(n, positions):
-    """Repeat the complete ordered-pair set until n examples, then shuffle."""
-    base = [make_example(xp, yp) for xp, yp in ordered_pairs(positions)]
-    examples = [base[i % len(base)] for i in range(n)]
+    """Build a class-balanced pool by repeating even-distance and odd-distance pairs."""
+    pairs_by_label = {'T': [], 'F': []}
+    for xp, yp in ordered_pairs(positions):
+        pairs_by_label[label_for(xp, yp)].append((xp, yp))
+    assert pairs_by_label['T'] and pairs_by_label['F'], \
+        f"need both even and odd distances in {positions}"
+    examples = []
+    for i in range(n):
+        label = 'T' if i % 2 == 0 else 'F'
+        xp, yp = pairs_by_label[label][(i // 2) % len(pairs_by_label[label])]
+        examples.append(make_example(xp, yp))
     random.shuffle(examples)
     return examples
 
@@ -91,6 +103,8 @@ with open(os.path.join(here, 'meta.pkl'), 'wb') as f:
         'filler': 'O',
         'split': 'small_half',
         'split_detail': '0-2->3-5',
+        'task': 'distance_parity',
+        'label_rule': 'T iff abs(index(X)-index(Y)) is even, else F',
         'train_positions': TRAIN_POSITIONS,
         'test_positions': TEST_POSITIONS,
     }, f)
@@ -109,11 +123,11 @@ def check_examples(examples, allowed_positions):
         assert body.count('X') == 1 and body.count('Y') == 1, e
         xp, yp = body.index('X'), body.index('Y')
         assert xp in allowed and yp in allowed, e
-        assert (xp < yp) == (label == 'T'), e
+        assert (abs(xp - yp) % 2 == 0) == (label == 'T'), e
         assert all(c in 'OXY' for c in body), e
 
 
-print("=== Tiny relative-order data prepared ===")
+print("=== Small X/Y even/odd distance measurement data prepared ===")
 print(f"LENGTH={LENGTH} SEED={SEED}")
 print(f"train/val positions: {TRAIN_POSITIONS}")
 print(f"test positions     : {TEST_POSITIONS}")
@@ -134,7 +148,9 @@ print()
 print("Examples:")
 for e in train_examples[:6]:
     body, label = e.split(':')
-    print(f"  train X@{body.index('X')} Y@{body.index('Y')} -> {label}   {e}")
+    d = abs(body.index('X') - body.index('Y'))
+    print(f"  train X@{body.index('X')} Y@{body.index('Y')} d={d} -> {label}   {e}")
 for e in test_examples[:6]:
     body, label = e.split(':')
-    print(f"  test  X@{body.index('X')} Y@{body.index('Y')} -> {label}   {e}")
+    d = abs(body.index('X') - body.index('Y'))
+    print(f"  test  X@{body.index('X')} Y@{body.index('Y')} d={d} -> {label}   {e}")

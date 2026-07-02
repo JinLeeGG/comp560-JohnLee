@@ -1,4 +1,4 @@
-# Config for the tiny relative-order sanity experiment.
+# Config for the small even/odd distance measurement sanity experiment.
 #
 # Advisor 6/30 setup:
 #   length 6, O/X/Y input alphabet, train positions 0..2, test positions 3..5,
@@ -6,7 +6,7 @@
 #   before returning to larger experiments.
 
 out_dir = 'out'
-data_dir = 'data/order'
+data_dir = 'data/evenodd_distance'
 eval_interval = 250
 log_interval = 250
 

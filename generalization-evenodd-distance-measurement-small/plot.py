@@ -14,7 +14,7 @@ Produces (PNG, 150 DPI, into out/):
 Only methods that actually have rows are plotted, in a fixed order, so the figure extends
 itself automatically as sinusoidal / rope / t5 are added later.
 
-Usage (from generalization-order-small/):
+Usage (from generalization-evenodd-distance-measurement-small/):
     ../venv/bin/python plot.py --split=small_half
 """
 import os
@@ -126,7 +126,7 @@ def plot_bars(split, out_dir, results_csv, methods_filter=None, suffix='', prefi
     ax.set_ylim(0, 105)
     ax.set_ylabel('accuracy (%)')
     ax.set_xlabel('positional encoding')
-    ax.set_title(f'relative order — held-out generalization ({display_split} split)\n'
+    ax.set_title(f'X/Y even/odd distance measurement — held-out generalization ({display_split} split)\n'
                  f'gray = in-distribution val; blue dots = held-out seeds', fontsize=11)
     ax.grid(axis='y', alpha=0.25)
     ax.legend(loc='lower left')
@@ -147,9 +147,9 @@ def plot_bars(split, out_dir, results_csv, methods_filter=None, suffix='', prefi
     f_mean = [mean_std(v)[0] for v in f_vals]
     f_std = [mean_std(v)[1] for v in f_vals]
     ax.bar(x - w / 2, t_mean, w, yerr=clip_err(t_mean, t_std), capsize=5,
-           color='#41ab5d', alpha=0.55, label='T (X before Y), mean')
+           color='#41ab5d', alpha=0.55, label='T (even distance), mean')
     ax.bar(x + w / 2, f_mean, w, yerr=clip_err(f_mean, f_std), capsize=5,
-           color='#fe9929', alpha=0.55, label='F (Y before X), mean')
+           color='#fe9929', alpha=0.55, label='F (odd distance), mean')
     for xi, tv, fv in zip(x, t_vals, f_vals):
         ax.scatter([xi - w / 2] * len(tv), tv, color='#00441b', s=22, zorder=3,
                    label='per seed' if xi == x[0] else None)
@@ -159,7 +159,7 @@ def plot_bars(split, out_dir, results_csv, methods_filter=None, suffix='', prefi
     ax.set_ylim(0, 105)
     ax.set_ylabel('held-out accuracy (%)')
     ax.set_xlabel('')
-    ax.set_title(f'relative order — per-class held-out accuracy ({display_split} split)\n'
+    ax.set_title(f'X/Y even/odd distance measurement — per-class held-out accuracy ({display_split} split)\n'
                  f'dots = seeds; 0/100 split = collapse to one label', fontsize=11)
     ax.grid(axis='y', alpha=0.25)
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=4, fontsize=8)
@@ -243,7 +243,7 @@ def plot_per_position(split, out_dir, predictions_csv, results_csv, methods_filt
         ax.tick_params(labelsize=8)
     for ax in flat_axes[len(methods):]:
         ax.axis('off')
-    fig.suptitle(f'relative order — per-position diagnostic sweep ({display_split} split, pooled over seeds)\n'
+    fig.suptitle(f'X/Y even/odd distance measurement — per-position diagnostic sweep ({display_split} split, pooled over seeds)\n'
                  f'cell = accuracy with X at row, Y at col; gray diagonal = X==Y excluded',
                  fontsize=12)
     cbar = fig.colorbar(im, ax=flat_axes[:len(methods)].tolist(), fraction=0.035, pad=0.02)

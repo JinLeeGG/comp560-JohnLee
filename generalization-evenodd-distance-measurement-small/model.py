@@ -146,11 +146,11 @@ class MicroTransformer(nn.Module):
         x = self.ln_f(x)
         return x                             # (B, T, n_embd)
 
-    def classify(self, idx, readout='mean_body', input_mode='body_only'):
+    def classify(self, idx, readout='mean_body', input_mode='no_colon'):
         """Return 2-class logits from the sequence hidden states."""
         hidden = self(idx)
         if readout in ('mean', 'mean_body'):
-            if input_mode == 'body_plus_colon':
+            if input_mode in ('with_colon', 'body_plus_colon'):
                 pooled = hidden[:, :-1, :].mean(dim=1)
             else:
                 pooled = hidden.mean(dim=1)

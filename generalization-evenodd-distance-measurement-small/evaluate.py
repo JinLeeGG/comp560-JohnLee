@@ -1,10 +1,10 @@
 """
-Evaluation script for the relative-order task (from-scratch micro-transformer engine).
+Evaluation script for the X/Y even/odd distance measurement task.
 
-Reads the held-out test examples (data/order/test.txt), feeds each six-token body to
+Reads the held-out test examples (data/evenodd_distance/test.txt), feeds each six-token body to
 the model, and checks the 2-class classifier prediction against the gold T/F label.
 
-    LABEL MAPPING (must match prepare.py):  T  iff  index(X) < index(Y).
+    LABEL MAPPING (must match prepare.py): T iff abs(index(X)-index(Y)) is even.
 
 Because the task is binary, chance is 50%. We report PER-CLASS accuracy (T vs F), not just
 overall: a model that always outputs one label scores 50% overall, and per-class accuracy
@@ -17,9 +17,9 @@ This script also LOGS results so figures regenerate themselves as methods/seeds 
                       per-position "cliff". The sweep is generated here, deterministically,
                       independent of the data split, so heatmaps are comparable across runs.
 
-Usage (from generalization-order-small/):
+Usage (from generalization-evenodd-distance-measurement-small/):
     ../venv/bin/python evaluate.py config/basic.py --pos_type=none
-    ../venv/bin/python evaluate.py config/basic.py --test_file=data/order/test.txt
+    ../venv/bin/python evaluate.py config/basic.py --test_file=data/evenodd_distance/test.txt
 """
 import os
 import sys
@@ -35,7 +35,7 @@ from model import MicroTransformer, MicroTransformerConfig
 
 # ----- config (overridable by the config file + --key=value args) -----
 out_dir = 'out'
-data_dir = 'data/order'
+data_dir = 'data/evenodd_distance'
 test_file = ''          # if empty, defaults to <data_dir>/test.txt
 device = 'cpu'
 seed = 1337
@@ -92,16 +92,16 @@ causal = checkpoint['model_args'].get('causal', True)
 train_seed = checkpoint.get('seed', seed)     # authoritative seed = the one trained with
 val_acc = checkpoint.get('val_acc')           # in-distribution val accuracy (overall)
 readout = checkpoint.get('readout', 'last')
-input_mode = input_mode or checkpoint.get('input_mode', 'body_only')
+input_mode = input_mode or checkpoint.get('input_mode', 'no_colon')
 class_names = checkpoint.get('class_names', ['F', 'T'])
 
 
 @torch.no_grad()
 def predict_batch(bodies):
     """Greedy classifier label for a list of length-LENGTH bodies."""
-    if input_mode == 'body_only':
+    if input_mode in ('no_colon', 'body_only'):
         seqs = bodies
-    elif input_mode == 'body_plus_colon':
+    elif input_mode in ('with_colon', 'body_plus_colon'):
         seqs = [b + ':' for b in bodies]
     else:
         raise ValueError(f"unknown input_mode: {input_mode!r}")
@@ -142,15 +142,15 @@ heldout_T_acc = cT / tT if tT else 0.0
 heldout_F_acc = cF / tF if tF else 0.0
 
 # report
-print("=== Relative-order Evaluation ===")
+print("=== X/Y Even/Odd Distance Measurement Evaluation ===")
 print(f"test_file: {test_file}")
 print(f"pos_type : {pos_type} | causal: {causal} | readout: {readout} | input_mode: {input_mode} | split: {split} ({split_detail}) | seed: {train_seed}")
 print(f"val acc  : {val_acc:.2%}" if val_acc is not None else "val acc  : (not in ckpt)")
 print(f"examples : {total}   (chance = 50%)")
 if tT:
-    print(f"T (X before Y): {cT}/{tT} = {heldout_T_acc:.2%}")
+    print(f"T (even distance): {cT}/{tT} = {heldout_T_acc:.2%}")
 if tF:
-    print(f"F (Y before X): {cF}/{tF} = {heldout_F_acc:.2%}")
+    print(f"F (odd distance) : {cF}/{tF} = {heldout_F_acc:.2%}")
 if total:
     print(f"OVERALL       : {correct}/{total} = {heldout_acc:.2%}")
 if nonbinary:
@@ -175,7 +175,7 @@ def append_csv(path, header, rows):
 def build_sweep(per_pair, length, sweep_seed=0):
     """Diagnostic sweep: for EVERY ordered position pair (x_pos != y_pos), `per_pair` random
     bodies with X at x_pos and Y at y_pos. Spans the whole position range (both the train
-    and held-out regions) and is class-balanced (x<y -> T, x>y -> F). Deterministic, so the
+    and held-out regions) and labels even/odd distance. Deterministic, so the
     per-position heatmap is comparable across runs/methods."""
     rng = random.Random(sweep_seed)
     out = []
@@ -183,7 +183,7 @@ def build_sweep(per_pair, length, sweep_seed=0):
         for yp in range(length):
             if xp == yp:
                 continue
-            label = 'T' if xp < yp else 'F'
+            label = 'T' if abs(xp - yp) % 2 == 0 else 'F'
             for _ in range(per_pair):
                 chars = [FILLER for _ in range(length)]
                 chars[xp], chars[yp] = 'X', 'Y'

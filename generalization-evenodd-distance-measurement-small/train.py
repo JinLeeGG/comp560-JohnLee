@@ -1,18 +1,18 @@
 """
-Training loop for the from-scratch micro-transformer (tiny relative-order task).
+Training loop for the from-scratch micro-transformer (small X/Y even/odd distance measurement task).
 
-Same engine and structure as the relative-order experiment, but cleaned up for the
+Same engine and structure as the small PE experiments, but cleaned up for the
 tiny non-causal sanity check:
 
   1. Per-example batching. Each row is exactly one example -- "<body>:<label>" --
      so there is no packing and no truncation, and an example's positions never blur
-     across a training window. (Critical once position determines the answer -- which,
-     for relative order, it does.)
+     across a training window. This matters because position/distance determines
+     the answer.
 
   2. Classifier loss. A real 2-class head predicts F/T from the body hidden states.
      input_mode controls whether ':' is also present in attention context.
 
-Usage (from generalization-order-small/):
+Usage (from generalization-evenodd-distance-measurement-small/):
     ../venv/bin/python train.py config/basic.py
     ../venv/bin/python train.py config/basic.py --max_iters=500 --pos_type=none
 """
@@ -31,7 +31,7 @@ from model import MicroTransformer, MicroTransformerConfig
 
 # ---------------------------- config (overridable) ----------------------------
 out_dir = 'out'
-data_dir = 'data/order'
+data_dir = 'data/evenodd_distance'
 eval_interval = 250
 log_interval = 100
 
@@ -45,7 +45,7 @@ bias = True
 pos_type = 'learned'
 causal = True
 readout = 'mean_body'
-input_mode = 'body_only'  # 'body_only' or 'body_plus_colon'
+input_mode = 'no_colon'  # 'no_colon' or 'with_colon'
 n_classes = 2
 
 # optimizer / schedule (in line with the previous nanoGPT config)
@@ -99,16 +99,16 @@ decode = lambda ids: ''.join(itos[i] for i in ids)
 def load_examples(name):
     """Read a flat .bin stream (written by prepare.py) back into one example per row.
 
-    Each example is "<body>:<label>". In body_only mode, the model sees just <body>.
-    In body_plus_colon mode, the model sees <body>:, but pooling still averages only
+    Each example is "<body>:<label>". In no_colon mode, the model sees just <body>.
+    In with_colon mode, the model sees <body>:, but pooling still averages only
     body positions. Labels map to 2-class targets: F=0, T=1.
     """
     ids = np.fromfile(os.path.join(data_dir, f'{name}.bin'), dtype=np.uint16)
     lines = [ln for ln in decode(ids.tolist()).split('\n') if ln]
     bodies, labels = zip(*(ln.split(':') for ln in lines))
-    if input_mode == 'body_only':
+    if input_mode in ('no_colon', 'body_only'):
         seqs = list(bodies)
-    elif input_mode == 'body_plus_colon':
+    elif input_mode in ('with_colon', 'body_plus_colon'):
         seqs = [body + ':' for body in bodies]
     else:
         raise ValueError(f"unknown input_mode: {input_mode!r}")
