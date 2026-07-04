@@ -27,6 +27,7 @@ class MicroTransformerConfig:
     pos_type: str = 'learned'       # 'none' | 'learned' | 'sinusoidal' | 'rope' | 't5'
     causal: bool = True             # True = decoder mask; False = bidirectional attention
     n_classes: int = 2              # F/T classifier classes
+    mask_marker_key: str = ''       # '' | 'last' | 'first': prevent body queries attending to marker key
 
 
 class CausalSelfAttention(nn.Module):
@@ -41,6 +42,7 @@ class CausalSelfAttention(nn.Module):
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
         self.causal = config.causal
+        self.mask_marker_key = config.mask_marker_key
         # The PE module is owned and registered by the parent MicroTransformer. We keep a
         # NON-registered reference here (wrapped in a tuple so nn.Module doesn't register
         # it as a submodule) -- otherwise a parametric PE like learned-absolute would be
@@ -71,6 +73,10 @@ class CausalSelfAttention(nn.Module):
         bias = self.pe.attention_bias(T, x.device)                     # Branch C (t5)
         if bias is not None:
             att = att + bias
+        if self.mask_marker_key == 'last' and T > 1:
+            att[:, :, :-1, -1] = float('-inf')
+        elif self.mask_marker_key == 'first' and T > 1:
+            att[:, :, 1:, 0] = float('-inf')
         if self.causal:
             att = att.masked_fill(self.causal_mask[:, :, :T, :T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)

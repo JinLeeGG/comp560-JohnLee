@@ -46,6 +46,7 @@ pos_type = 'learned'
 causal = True
 readout = 'mean_body'
 input_mode = 'no_colon'  # 'no_colon' | 'with_colon' | 'front_colon'
+mask_marker_key = ''     # '' | 'last' | 'first': mask marker as an attention key for body queries
 n_classes = 2
 
 # optimizer / schedule (in line with the previous nanoGPT config)
@@ -137,11 +138,12 @@ def get_batch():
 # ------------------------------- model ------------------------------
 model_args = dict(vocab_size=vocab_size, block_size=block_size, n_layer=n_layer,
                   n_head=n_head, n_embd=n_embd, dropout=dropout, bias=bias,
-                  pos_type=pos_type, causal=causal, n_classes=n_classes)
+                  pos_type=pos_type, causal=causal, n_classes=n_classes,
+                  mask_marker_key=mask_marker_key)
 model = MicroTransformer(MicroTransformerConfig(**model_args))
 model.to(device)
 print(f"model: pos_type={pos_type} | causal={causal} | {model.num_params()/1e6:.2f}M params")
-print(f"readout: {readout} | input_mode: {input_mode}")
+print(f"readout: {readout} | input_mode: {input_mode} | mask_marker_key: {mask_marker_key or '(none)'}")
 
 # AdamW with the usual decay / no-decay split (no weight decay on biases & LayerNorm).
 decay = [p for p in model.parameters() if p.dim() >= 2]
