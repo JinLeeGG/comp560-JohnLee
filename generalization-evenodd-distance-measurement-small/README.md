@@ -14,7 +14,7 @@ vocab        = O, X, Y, T, F, :, newline
 label        = T iff abs(index(X)-index(Y)) is even, else F
 train/val    = X and Y only in positions 0,1,2
 test         = X and Y only in positions 3,4,5
-mask         = causal=False first
+mask         = causal=False
 readout      = mean over the body-token hidden states
 ```
 
@@ -42,9 +42,9 @@ The T5-style code is in [pos_encoding.py](pos_encoding.py):
 
 The attention layer uses it in [model.py](model.py):
 
-- attention scores are computed at lines 69-70
-- `bias = self.pe.attention_bias(...)` is called at line 71
-- the bias is added to attention logits at lines 72-73
+- attention scores are computed at line 72
+- `bias = self.pe.attention_bias(...)` is called at line 73
+- the bias is added to attention logits at lines 74-75
 
 The implementation is intentionally simple:
 
@@ -68,12 +68,14 @@ This is not a full T5 architecture; it is only the T5-style relative attention b
 
 ## Current Results
 
-Two input modes are logged separately:
+The main input modes are logged separately:
 
 - [no_colon](log/2026-07-02-no-colon.md): the transformer sees only the six
   body tokens.
 - [with_colon](log/2026-07-02-with-colon.md): the transformer also
   sees the fixed final `:` token, but the classifier still pools only body tokens.
+- [colon-position ablation](log/2026-07-04-colon-position-ablation.md): checks whether
+  the weird T5 result is caused by the `:` marker acting as a fixed positional anchor.
 
 No-colon result, four seeds (`1337`, `2024`, `31415`, `27182`):
 
@@ -98,6 +100,19 @@ With-colon result, four seeds (`1337`, `2024`, `31415`, `27182`):
 Interpretation: no-colon matches the meeting hypothesis across four seeds. Adding `:`
 specifically hurts simplified T5 generalization while RoPE stays robust.
 
+Colon-anchor follow-up, four seeds:
+
+| condition | RoPE held-out | T5 held-out |
+|----|-----:|-----:|
+| `no_colon` | 100.0 +/- 0.0 | 100.0 +/- 0.0 |
+| `with_colon` | 100.0 +/- 0.0 | 56.2 +/- 10.8 |
+| `front_colon` | 100.0 +/- 0.0 | 68.8 +/- 20.7 |
+| `with_colon_masked` | 100.0 +/- 0.0 | 100.0 +/- 0.0 |
+
+The masked-colon condition keeps the final `:` in the input but prevents body-token
+queries from attending to that final marker key. This restores T5 to 100%, supporting
+the fixed-anchor explanation.
+
 ## Run
 
 From this directory:
@@ -108,8 +123,8 @@ From this directory:
 for pe in none learned sinusoidal rope t5; do
   ../venv/bin/python train.py config/no_colon.py --pos_type=$pe
   ../venv/bin/python evaluate.py config/no_colon.py \
-    --results_csv=results_no_colon.csv \
-    --predictions_csv=predictions_no_colon.csv
+    --results_csv=results_no_colon_lateststyle.csv \
+    --predictions_csv=predictions_no_colon_lateststyle.csv
 done
 
 ../venv/bin/python plot_latest_commit_style.py --split=half \
@@ -124,7 +139,9 @@ For seed repeats:
 for pe in none learned sinusoidal rope t5; do
   for s in 1337 2024 31415 27182; do
     ../venv/bin/python train.py config/no_colon.py --pos_type=$pe --seed=$s
-    ../venv/bin/python evaluate.py config/no_colon.py
+    ../venv/bin/python evaluate.py config/no_colon.py \
+      --results_csv=results_no_colon_lateststyle.csv \
+      --predictions_csv=predictions_no_colon_lateststyle.csv
   done
 done
 ```

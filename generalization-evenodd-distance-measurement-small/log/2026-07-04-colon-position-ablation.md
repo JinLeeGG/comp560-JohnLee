@@ -17,6 +17,9 @@ T iff abs(index(X) - index(Y)) is even
 F iff abs(index(X) - index(Y)) is odd
 ```
 
+The body length is always 6. The train/val examples keep `X` and `Y` in positions
+`0,1,2`; held-out examples keep them in positions `3,4,5`.
+
 First, I changed the marker position:
 
 | condition | model input example |
@@ -34,6 +37,24 @@ Then I added one masking condition:
 These follow-ups only rerun `rope` and `t5`, because those are the two relative-position
 methods relevant to the weird behavior.
 
+## Config
+
+| item | value |
+|---|---|
+| directory | `generalization-evenodd-distance-measurement-small/` |
+| configs | `config/front_colon.py`, `config/with_colon_masked.py` |
+| compared PEs | `rope`, `t5` |
+| model | 3 layers, 2 heads, 32 dim, about 0.04M params |
+| mask | `causal=False` |
+| seeds | `1337`, `2024`, `31415`, `27182` |
+
+## Hypothesis
+
+If the final `:` hurts T5 because it acts as a fixed positional anchor, then moving the
+marker should change T5's held-out behavior, and masking attention to the marker should
+remove the failure. RoPE should stay stable because it already generalized in both
+no-colon and with-colon runs.
+
 ## Commands
 
 ```bash
@@ -43,8 +64,8 @@ for seed in 1337 2024 31415 27182; do
   for pe in rope t5; do
     ../venv/bin/python train.py config/front_colon.py --seed=$seed --pos_type=$pe
     ../venv/bin/python evaluate.py config/front_colon.py \
-      --results_csv=results_front_colon.csv \
-      --predictions_csv=predictions_front_colon.csv \
+      --results_csv=results_front_colon_lateststyle.csv \
+      --predictions_csv=predictions_front_colon_lateststyle.csv \
       --show_errors=0
   done
 done
@@ -53,12 +74,25 @@ for seed in 1337 2024 31415 27182; do
   for pe in rope t5; do
     ../venv/bin/python train.py config/with_colon_masked.py --seed=$seed --pos_type=$pe
     ../venv/bin/python evaluate.py config/with_colon_masked.py \
-      --results_csv=results_with_colon_masked.csv \
-      --predictions_csv=predictions_with_colon_masked.csv \
+      --results_csv=results_with_colon_masked_lateststyle.csv \
+      --predictions_csv=predictions_with_colon_masked_lateststyle.csv \
       --show_errors=0
   done
 done
+
+../venv/bin/python plot_latest_commit_style.py --split=half \
+  --results_csv=results_front_colon_lateststyle.csv \
+  --predictions_csv=predictions_front_colon_lateststyle.csv \
+  --out_dir=log/figures/front_colon
+
+../venv/bin/python plot_latest_commit_style.py --split=half \
+  --results_csv=results_with_colon_masked_lateststyle.csv \
+  --predictions_csv=predictions_with_colon_masked_lateststyle.csv \
+  --out_dir=log/figures/with_colon_masked
 ```
+
+The masking code is in `model.py`, lines 76-79. For `mask_marker_key='last'`, body-token
+queries cannot attend to the final `:` key, but the input still contains the `:` token.
 
 ## Results
 
@@ -84,35 +118,35 @@ For `with_colon_masked`, T5 held-out accuracy by seed was:
 ```
 
 **Figure 1 - Front-colon held-out vs validation accuracy.**
-What to look for: RoPE stays perfect, while T5 becomes seed-sensitive when the marker
+RoPE stays perfect, while T5 becomes seed-sensitive when the marker
 is moved to the front.
 
 <img src="figures/front_colon/heldout_accuracy_half.png" alt="front-colon held-out accuracy by PE" width="680">
 
 **Figure 2 - Front-colon held-out accuracy by class.**
-What to look for: this shows which label T5 collapses on in the seeds where it fails.
+This shows which label T5 collapses on in the seeds where it fails.
 
 <img src="figures/front_colon/heldout_perclass_half.png" alt="front-colon per-class held-out accuracy by PE" width="680">
 
 **Figure 3 - Front-colon per-position heatmap.**
-What to look for: the failure pattern changes when the fixed marker moves from the end
+The failure pattern changes when the fixed marker moves from the end
 to the front.
 
 <img src="figures/front_colon/per_position_half.png" alt="front-colon per-position accuracy heatmaps" width="900">
 
 **Figure 4 - Masked-colon held-out vs validation accuracy.**
-What to look for: T5 returns to 100% when the final `:` is still present but cannot be
+T5 returns to 100% when the final `:` is still present but cannot be
 attended to by body tokens.
 
 <img src="figures/with_colon_masked/heldout_accuracy_half.png" alt="with-colon-masked held-out accuracy by PE" width="680">
 
 **Figure 5 - Masked-colon held-out accuracy by class.**
-What to look for: both T/even and F/odd recover to 100% for T5.
+Both T/even and F/odd recover to 100% for T5.
 
 <img src="figures/with_colon_masked/heldout_perclass_half.png" alt="with-colon-masked per-class held-out accuracy by PE" width="680">
 
 **Figure 6 - Masked-colon per-position heatmap.**
-What to look for: masking attention to the marker removes the held-out failure pattern.
+Masking attention to the marker removes the held-out failure pattern.
 
 <img src="figures/with_colon_masked/per_position_half.png" alt="with-colon-masked per-position accuracy heatmaps" width="900">
 
