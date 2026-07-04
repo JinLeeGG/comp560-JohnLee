@@ -83,9 +83,20 @@ Mean +/- standard deviation over 4 seeds. Chance is 50%.
 | `rope` | 100.0 +/- 0.0 | 100.0 +/- 0.0 | 100, 100, 100, 100 |
 | `t5` | 100.0 +/- 0.0 | 56.2 +/- 10.8 | 50, 75, 50, 50 |
 
+**Figure 1 - Held-out vs validation accuracy.**
+What to look for: T5 has 100% validation accuracy but poor held-out accuracy, so it
+learns the train positions but does not transfer well with the final `:` present.
+
 <img src="figures/with_colon/heldout_accuracy_half.png" alt="with-colon held-out accuracy by PE" width="680">
 
+**Figure 2 - Held-out accuracy by class.**
+What to look for: T5's failure is mostly a class-specific collapse, not random noise.
+
 <img src="figures/with_colon/heldout_perclass_half.png" alt="with-colon per-class held-out accuracy by PE" width="680">
+
+**Figure 3 - Per-position diagnostic heatmap.**
+What to look for: RoPE stays correct in the held-out block, while T5 becomes unreliable
+after adding the final `:` marker.
 
 <img src="figures/with_colon/per_position_half.png" alt="with-colon per-position accuracy heatmaps" width="900">
 

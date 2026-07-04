@@ -83,15 +83,36 @@ For `with_colon_masked`, T5 held-out accuracy by seed was:
 100, 100, 100, 100
 ```
 
+**Figure 1 - Front-colon held-out vs validation accuracy.**
+What to look for: RoPE stays perfect, while T5 becomes seed-sensitive when the marker
+is moved to the front.
+
 <img src="figures/front_colon/heldout_accuracy_half.png" alt="front-colon held-out accuracy by PE" width="680">
+
+**Figure 2 - Front-colon held-out accuracy by class.**
+What to look for: this shows which label T5 collapses on in the seeds where it fails.
 
 <img src="figures/front_colon/heldout_perclass_half.png" alt="front-colon per-class held-out accuracy by PE" width="680">
 
+**Figure 3 - Front-colon per-position heatmap.**
+What to look for: the failure pattern changes when the fixed marker moves from the end
+to the front.
+
 <img src="figures/front_colon/per_position_half.png" alt="front-colon per-position accuracy heatmaps" width="900">
+
+**Figure 4 - Masked-colon held-out vs validation accuracy.**
+What to look for: T5 returns to 100% when the final `:` is still present but cannot be
+attended to by body tokens.
 
 <img src="figures/with_colon_masked/heldout_accuracy_half.png" alt="with-colon-masked held-out accuracy by PE" width="680">
 
+**Figure 5 - Masked-colon held-out accuracy by class.**
+What to look for: both T/even and F/odd recover to 100% for T5.
+
 <img src="figures/with_colon_masked/heldout_perclass_half.png" alt="with-colon-masked per-class held-out accuracy by PE" width="680">
+
+**Figure 6 - Masked-colon per-position heatmap.**
+What to look for: masking attention to the marker removes the held-out failure pattern.
 
 <img src="figures/with_colon_masked/per_position_half.png" alt="with-colon-masked per-position accuracy heatmaps" width="900">
 
