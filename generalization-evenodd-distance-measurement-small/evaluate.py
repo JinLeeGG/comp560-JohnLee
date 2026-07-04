@@ -103,6 +103,8 @@ def predict_batch(bodies):
         seqs = bodies
     elif input_mode in ('with_colon', 'body_plus_colon'):
         seqs = [b + ':' for b in bodies]
+    elif input_mode == 'front_colon':
+        seqs = [':' + b for b in bodies]
     else:
         raise ValueError(f"unknown input_mode: {input_mode!r}")
     ids = torch.tensor([encode(s) for s in seqs], dtype=torch.long, device=device)

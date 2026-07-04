@@ -45,7 +45,7 @@ bias = True
 pos_type = 'learned'
 causal = True
 readout = 'mean_body'
-input_mode = 'no_colon'  # 'no_colon' or 'with_colon'
+input_mode = 'no_colon'  # 'no_colon' | 'with_colon' | 'front_colon'
 n_classes = 2
 
 # optimizer / schedule (in line with the previous nanoGPT config)
@@ -100,8 +100,9 @@ def load_examples(name):
     """Read a flat .bin stream (written by prepare.py) back into one example per row.
 
     Each example is "<body>:<label>". In no_colon mode, the model sees just <body>.
-    In with_colon mode, the model sees <body>:, but pooling still averages only
-    body positions. Labels map to 2-class targets: F=0, T=1.
+    In with_colon/front_colon mode, the model sees a fixed ':' marker at the end/front,
+    but pooling still averages only body positions. Labels map to 2-class targets: F=0,
+    T=1.
     """
     ids = np.fromfile(os.path.join(data_dir, f'{name}.bin'), dtype=np.uint16)
     lines = [ln for ln in decode(ids.tolist()).split('\n') if ln]
@@ -110,6 +111,8 @@ def load_examples(name):
         seqs = list(bodies)
     elif input_mode in ('with_colon', 'body_plus_colon'):
         seqs = [body + ':' for body in bodies]
+    elif input_mode == 'front_colon':
+        seqs = [':' + body for body in bodies]
     else:
         raise ValueError(f"unknown input_mode: {input_mode!r}")
     toks = [encode(seq) for seq in seqs]

@@ -152,6 +152,8 @@ class MicroTransformer(nn.Module):
         if readout in ('mean', 'mean_body'):
             if input_mode in ('with_colon', 'body_plus_colon'):
                 pooled = hidden[:, :-1, :].mean(dim=1)
+            elif input_mode == 'front_colon':
+                pooled = hidden[:, 1:, :].mean(dim=1)
             else:
                 pooled = hidden.mean(dim=1)
         elif readout == 'first':
