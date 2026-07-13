@@ -103,7 +103,7 @@ def make(kind):
         v = np.array(held[pe])
         c = FAM_COLOR[FAMILY[pe]]
         if kind == 'bar':
-            ax.bar(x, v.mean(), width=0.5, color=c, alpha=0.18, zorder=2,
+            ax.bar(x, v.mean(), width=0.5, color=c, alpha=0.32, zorder=2,
                    edgecolor=c, linewidth=1.0)
         else:  # strip: mean line
             ax.hlines(v.mean(), x - 0.26, x + 0.26, color=c, lw=2.8, zorder=3)
