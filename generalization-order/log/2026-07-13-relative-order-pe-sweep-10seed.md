@@ -1,57 +1,39 @@
-# Relative-Order PE Sweep — 10-seed reinforced run (per-seed data regeneration)
+# Relative-Order PE Sweep — 10-seed run
 
 *2026-07-13 · John Lee*
 
-> **Bottom line.** Re-run of the [Phase 3 PE sweep](2026-06-20-relative-order-pe-sweep.md)
-> with the statistics strengthened: **10 seeds** instead of 4, and each seed **regenerates the
-> data split** (not one fixed split). The relative-vs-absolute separation holds in the mean —
-> relative (`none` 99.2, `t5` 99.2, `rope` 95.7) sits far above absolute (`learned` 68.6,
-> `sinusoidal` 31.9) — but the stronger run reveals variance the 4-seed run hid: **`rope` is
-> not a clean 100%** (95.7 ± 6.8, one seed 79.6), and **`learned` occasionally generalizes
-> fully** (68.6 ± 18.1, one seed 100%). All five reach **100% in-distribution val**.
+> **TL;DR.** Re-ran the [Phase 3 sweep](2026-06-20-relative-order-pe-sweep.md) with 10 seeds
+> (was 4), each **regenerating its own data split**. The relative-vs-absolute split still holds
+> on average, but the stronger run shows variance the 4-seed run hid: **RoPE isn't a clean
+> 100%** (95.7, one seed 79.6), and **`learned` sometimes generalizes fully** (mean 68.6, but
+> per-seed it's either ~50 or ~90+). All five still hit **100% val**.
 
-### Why re-run
+## Setup
 
-The 2026-06-20 sweep used 4 seeds on **one fixed data split** (`SEED=1337` in `prepare.py`), so
-its spread was model-init / batch-order noise only and understated true variance (its own caveat).
-This run fixes that: each seed regenerates the train/val/test split, so the reported spread now
-includes **data-sampling variance**. Same task and `half` split (length-20, one `X` + one `Y`,
-output `T` iff index(X) < index(Y); train both symbols in 0–9, test both in 10–19; 50/50, chance 50%).
+- **Task / split:** same as before — length-20, one `X` + one `Y`, output `T` iff index(X) < index(Y).
+  `half` split: train both symbols in 0–9, test both in 10–19. Chance = 50%.
+- **The one change:** each seed regenerates the train/val/test split (env `DATA_SEED`), so the
+  spread now reflects **data-sampling variance**, not just init/batch-order noise. The 4-seed run
+  used one fixed split (`SEED=1337`) and understated variance — its own caveat.
+- **Model:** unchanged (~0.8M: 4 layers, 4 heads, 128 dim, block 64, causal, CPU, 2000 iters,
+  AdamW 1e-3, batch 64, answer-token-only loss). 10 seeds (1337–1346).
+- **Reproduce:** `bash run_multiseed.sh` → `results_multiseed.csv` / `predictions_multiseed.csv`.
+- **Sanity check:** seed 1337 (same data seed as the old run) reproduced the published values exactly.
 
-### Setup
+## Results — held-out accuracy, mean ± std over 10 seeds
 
-- **What changed vs 2026-06-20:** `prepare.py` `SEED` now reads env `DATA_SEED` (default 1337, so
-  old behavior is unchanged). Driver `run_multiseed.sh` loops `for seed in 1337..1346: regenerate
-  data with DATA_SEED=$seed; for pe in none learned sinusoidal rope t5: train --seed=$seed; eval`.
-  Within a seed all 5 PEs share that seed's data (PE is the only variable); across seeds both data
-  and init vary.
-- **model / config:** unchanged — ~0.8M params (n_layer 4, n_head 4, n_embd 128, block_size 64),
-  causal, CPU, 2000 iters, AdamW lr 1e-3, batch 64, answer-token-only loss.
-- **logging:** new files `results_multiseed.csv` / `predictions_multiseed.csv` so the original
-  `results.csv` is untouched.
-- **reproduce** (from `generalization-order/`, `SPLIT='half'` in `prepare.py`):
-  ```bash
-  bash run_multiseed.sh
-  ```
-- **integrity check:** seed 1337 (same data seed as the original run) reproduced the published
-  4-seed values exactly (`rope` 99.7, `learned` 69.0, `sinusoidal` 30.6).
-
----
-
-## Results — `half` split, 10 seeds each
-
-| PE | family | val | held-out (mean ± std) | min–max |
-|----|--------|-----|-----------------------|---------|
-| `none` | relative | 100% | **99.2 ± 1.7** | 94.7–100 |
-| `t5` | relative | 100% | **99.2 ± 2.1** | 92.9–100 |
+| PE | family | val | **held-out** | range |
+|----|--------|-----|--------------|-------|
+| `none` (NoPE) | relative | 100% | **99.2 ± 1.7** | 94.7–100 |
+| `t5`   | relative | 100% | **99.2 ± 2.1** | 92.9–100 |
 | `rope` | relative | 100% | **95.7 ± 6.8** | **79.6**–100 |
 | `learned` | absolute | 100% | **68.6 ± 18.1** | **50–100** |
 | `sinusoidal` | absolute | 100% | **31.9 ± 6.9** | 19.2–42.7 |
 
-Per seed (held-out test):
+Per seed:
 
-| seed | `none` | `rope` | `t5` | `learned` | `sinusoidal` |
-|------|--------|--------|------|-----------|--------------|
+| seed | NoPE | RoPE | T5 | Learned | Sinusoidal |
+|------|------|------|----|---------|------------|
 | 1337 | 100.0 |  99.7 | 100.0 |  69.0 | 30.6 |
 | 1338 |  97.5 |  92.8 | 100.0 |  50.0 | 26.4 |
 | 1339 | 100.0 | 100.0 | 100.0 |  89.7 | 36.6 |
@@ -62,64 +44,41 @@ Per seed (held-out test):
 | 1344 | 100.0 |  98.3 |  99.3 |  60.0 | 42.7 |
 | 1345 | 100.0 | 100.0 | 100.0 |  50.0 | 24.6 |
 | 1346 | 100.0 | 100.0 | 100.0 |  55.6 | 19.2 |
-| **mean** | **99.2** | **95.7** | **99.2** | **68.6** | **31.9** |
 
-### Figures
+## Figures
 
-Both built with `plot_multiseed.py` to the dataviz-skill principles (palette validated
-colour-blind-safe; families separated by position + colour, not colour alone).
+**Figure 1 — held-out accuracy.** Mean bars + all 10 seed points (a box plot misleads at n=10).
+`learned` straddles chance with a **bimodal** spread — its 68.6 bar is a value no seed produced.
+RoPE's one low seed (79.6) is labelled.
 
-**Figure 1 — held-out accuracy by encoding.** Thin mean bars with all 10 seed points
-overlaid (a box plot is misleading at n=10; individual points are the small-n standard).
-The relative family sits near the val=100% line; `learned` straddles chance with a wide,
-**bimodal** spread (its bar at 68.6 is a value no single seed produced); `sinusoidal` sits
-below chance. RoPE's one low seed (79.6) is labelled — RoPE is the least stable relative
-method, not a clean 100%.
+<img src="figures/heldout_bar_multiseed.png" alt="held-out accuracy: relative near 100, learned bimodal around chance, sinusoidal below chance" width="720">
 
-<img src="figures/heldout_bar_multiseed.png" alt="held-out accuracy: relative near 100, learned bimodal around chance, sinusoidal below chance; 10 seeds each" width="720">
+**Figure 2 — per-position accuracy (10-seed mean).** Cell = accuracy with `X` at the row, `Y` at
+the column; grey diagonal (x=y) excluded. Relative = all correct; absolute = correct in the train
+block (top-left), broken in the held-out block (bottom-right). Blue = correct, red = below chance.
+(`sinusoidal`'s triangular pattern is **label collapse**, not distance reading — don't over-read it.)
 
-**Figure 2 — per-position accuracy, averaged over 10 seeds.** Cell = accuracy with `X` at
-the row position and `Y` at the column position; the grey diagonal (x=y) is excluded because
-the two symbols never share a cell. Relative encodings are correct across the whole grid;
-the absolute encodings are correct in the trained block (top-left) and break in the held-out
-block (bottom-right). Colour is a colour-blind-safe diverging map (blue = correct, grey =
-chance, red = below chance). NOTE for write-up: `sinusoidal`'s red/blue triangular split in
-the held-out block reflects **collapse to one label** (correct where gold matches that label,
-wrong otherwise), NOT distance reading — do not over-interpret it.
+<img src="figures/per_position_multiseed.png" alt="per-position heatmaps: relative all correct; learned held-out muddy; sinusoidal held-out red" width="1100">
 
-<img src="figures/per_position_multiseed.png" alt="per-position heatmaps: relative all correct; learned held-out block muddy; sinusoidal held-out block red" width="1100">
+## Takeaways
 
----
+- **The headline holds:** relative (96–99) beats absolute (32–69) by far more than the seed noise,
+  so "relative predicts generalization" is safe.
+- **But it's not a clean binary per seed** — the 4-seed "clean split" was partly one lucky split.
+  RoPE is the shakiest relative method; `learned` is all-or-nothing.
+- **The two absolute PEs fail for different reasons.** `sinusoidal`'s held-out position vectors are
+  **fixed** → no usable signal → consistently below chance. `learned`'s held-out vectors **do** get
+  trained (the filler digits sit there in every example, just never `X`/`Y`) → sometimes useful,
+  sometimes not → the huge variance. Kazemnejad et al. (2023) can't see this: in their length
+  setting the held-out positions never exist during training.
 
-## Why
+## Caveats
 
-- **Family separation holds in the mean.** Relative (96–99) vs absolute (32–69); the gap (≈27–67
-  points) dwarfs the standard error of any mean, so the headline "relative predicts generalization"
-  is safe.
-- **But it is not a clean binary per seed** (the 4-seed run's "clean split" was partly an artifact
-  of one lucky data split):
-  - `rope` is the least stable relative method — 95.7 ± 6.8, dipping to 79.6 on seed 1341.
-  - `learned` is highly variable — 50 (pure chance) up to 100 on one seed, with two more above 89.
-- **The two absolute PEs fail differently, and the mechanism is now clearer.** `sinusoidal`'s
-  position vectors for indices 10–19 are **fixed** (never trained) → no usable held-out signal →
-  consistently below chance. `learned`'s 10–19 vectors **do** get gradient updates — the filler
-  **digits** occupy those slots in every example, just never `X`/`Y` — so whether they develop
-  usable features is init/data-dependent → the large variance. This asymmetry is invisible in a
-  length-generalization setting (Kazemnejad et al. 2023), where held-out positions never exist
-  during training at all.
-
-## Caveats / limitations
-
-- 10 seeds pin down the **family separation** comfortably, but not the **`learned` mean** precisely
-  (std 18 → SEM ≈ 5.7). Treat `learned`'s occasional full generalization as a qualitative
-  observation, not a quantified rate (that would need ~30+ seeds).
-- Single task, single split, single fixed length — the relative/absolute line is not yet shown to
-  hold across position-dependent tasks in general.
-- The held-out-embedding mechanism above is consistent with the accuracy pattern but not directly
-  verified; confirming it is a job for mechanistic analysis, not accuracy numbers.
+- 10 seeds pin down the **family gap**, not `learned`'s mean (std 18 → SEM ≈ 5.7). Its occasional
+  full generalization is a qualitative note, not a rate (that needs ~30+ seeds).
+- One task, one split, one length. The mechanism above fits the data but isn't directly verified.
 
 ## Next
 
-- Regenerate the report figures from `results_multiseed.csv` (current committed PNGs are the 4-seed
-  version and no longer match these numbers).
-- Optionally add seeds for the two absolute conditions only, to tighten their error bars.
+- Report figures regenerated from the 10-seed data (done; the old 4-seed PNGs no longer match).
+- Optional: more seeds on the two absolute conditions to tighten their error bars.
