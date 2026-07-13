@@ -60,11 +60,10 @@ Length generalization, training on short sequences and testing on longer ones,
 has been studied extensively. But a transformer can also fail without any change
 in sequence length: the shift can be over \emph{where} a task-relevant symbol
 sits within a fixed length. We study this fixed-length, held-out-position setting
-on a micro-transformer (under one million parameters) trained from scratch on a
-relative-order task. Given a length-20 string containing one \texttt{X} and one
-\texttt{Y}, the model decides whether \texttt{X} precedes \texttt{Y}. We train with both symbols in the first half of
-the string and test with both in the second half, and we compare five positional
-encodings under an otherwise identical model. All five learn the trained
+on a micro-transformer (under one million parameters), trained from scratch to
+decide which of two marked symbols in a string comes first. We train with both
+symbols in the first half of the string and test with both in the second half, and
+we compare five positional encodings under an otherwise identical model. All five learn the trained
 positions perfectly, but only the relative encodings (no positional encoding,
 rotary, and a T5-style relative bias) generalize to the held-out positions,
 while the absolute encodings (learned and sinusoidal) do not transfer reliably.
