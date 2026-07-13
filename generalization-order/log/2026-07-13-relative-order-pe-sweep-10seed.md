@@ -64,6 +64,31 @@ Per seed (held-out test):
 | 1346 | 100.0 | 100.0 | 100.0 |  55.6 | 19.2 |
 | **mean** | **99.2** | **95.7** | **99.2** | **68.6** | **31.9** |
 
+### Figures
+
+Both built with `plot_multiseed.py` to the dataviz-skill principles (palette validated
+colour-blind-safe; families separated by position + colour, not colour alone).
+
+**Figure 1 — held-out accuracy by encoding.** Thin mean bars with all 10 seed points
+overlaid (a box plot is misleading at n=10; individual points are the small-n standard).
+The relative family sits near the val=100% line; `learned` straddles chance with a wide,
+**bimodal** spread (its bar at 68.6 is a value no single seed produced); `sinusoidal` sits
+below chance. RoPE's one low seed (79.6) is labelled — RoPE is the least stable relative
+method, not a clean 100%.
+
+<img src="figures/heldout_bar_multiseed.png" alt="held-out accuracy: relative near 100, learned bimodal around chance, sinusoidal below chance; 10 seeds each" width="720">
+
+**Figure 2 — per-position accuracy, averaged over 10 seeds.** Cell = accuracy with `X` at
+the row position and `Y` at the column position; the grey diagonal (x=y) is excluded because
+the two symbols never share a cell. Relative encodings are correct across the whole grid;
+the absolute encodings are correct in the trained block (top-left) and break in the held-out
+block (bottom-right). Colour is a colour-blind-safe diverging map (blue = correct, grey =
+chance, red = below chance). NOTE for write-up: `sinusoidal`'s red/blue triangular split in
+the held-out block reflects **collapse to one label** (correct where gold matches that label,
+wrong otherwise), NOT distance reading — do not over-interpret it.
+
+<img src="figures/per_position_multiseed.png" alt="per-position heatmaps: relative all correct; learned held-out block muddy; sinusoidal held-out block red" width="1100">
+
 ---
 
 ## Why
