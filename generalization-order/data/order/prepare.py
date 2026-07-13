@@ -46,7 +46,10 @@ import random
 import numpy as np
 
 # ----------------------------- config -----------------------------
-SEED = 1337
+# DATA split seed. Default 1337 (unchanged behavior). Set env DATA_SEED to
+# regenerate the split per model seed, so multi-seed variance includes
+# data-sampling variance, not just model-init/batch-order noise.
+SEED = int(os.environ.get('DATA_SEED', '1337'))
 LENGTH = 20            # fixed input length (number of char slots before ':')
 
 # Which positions are HELD OUT (used only in the test set, never in training).
