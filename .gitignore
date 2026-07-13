@@ -17,3 +17,6 @@ out*/
 wandb/
 CLAUDE.md
 test.txt
+# editor / OS / tooling cruft
+.DS_Store
+.claude/
