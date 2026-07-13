@@ -89,7 +89,7 @@ def label_extreme(ax, held):
     """Selective direct label on the single narrative extreme: RoPE's low seed."""
     lo = min(held['rope'])
     xr = ORDER.index('rope')
-    ax.annotate(f'{lo:.0f}', xy=(xr, lo), xytext=(xr - 0.42, lo - 2),
+    ax.annotate(f'{lo:.1f}', xy=(xr, lo), xytext=(xr - 0.45, lo - 2),
                 fontsize=8.5, color=FAM_COLOR['relative'], va='center', ha='right',
                 arrowprops=dict(arrowstyle='-', color=FAM_COLOR['relative'], lw=0.8))
 
@@ -109,7 +109,7 @@ def make(kind):
             ax.hlines(v.mean(), x - 0.26, x + 0.26, color=c, lw=2.8, zorder=3)
         points(ax, x, v, c)
     label_extreme(ax, held)
-    ax.set_title('Held-out generalization by positional encoding (10 seeds)',
+    ax.set_title('Held-out accuracy by encoding (10 seeds)',
                  color=INK, fontsize=12)
     fig.tight_layout()
     name = 'heldout_strip_multiseed.png' if kind == 'strip' else 'heldout_bar_multiseed.png'
