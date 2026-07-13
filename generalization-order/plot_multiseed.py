@@ -151,33 +151,37 @@ def heatmap():
         'blu_red', ['#8c1d1d', '#d06b6b', '#f0efec', '#6b9fd0', '#0072B2'])
     box = dict(boxstyle='round,pad=0.2', fc='white', ec='none', alpha=0.75)
 
-    fig, axes = plt.subplots(1, len(ORDER), figsize=(3.0 * len(ORDER), 3.4),
+    # A 5-panel row gets scaled down to the single-column width, so fonts must be
+    # large in the source to survive. Taller panels + big fonts + sparse ticks.
+    fig, axes = plt.subplots(1, len(ORDER), figsize=(2.7 * len(ORDER), 4.2),
                              constrained_layout=True)
+    ticks = [0, 5, 10, 15]
     im = None
     for ax, pe in zip(axes, ORDER):
         M = np.ma.masked_invalid(corr[pe])
         im = ax.imshow(M, cmap=div, vmin=0, vmax=1, origin='upper')
         ax.set_facecolor('0.80')                     # excluded diagonal shows as grey
-        ax.set_title(LABEL[pe], fontsize=11, color=FAM_COLOR[FAMILY[pe]], fontweight='bold')
-        ax.set_xlabel('position of Y', fontsize=8.5)
+        ax.set_title(LABEL[pe], fontsize=17, color=FAM_COLOR[FAMILY[pe]], fontweight='bold')
+        ax.set_xlabel('position of Y', fontsize=13)
         if pe == ORDER[0]:
-            ax.set_ylabel('position of X', fontsize=8.5)
-        ax.tick_params(labelsize=7)
+            ax.set_ylabel('position of X', fontsize=13)
+        ax.set_xticks(ticks); ax.set_yticks(ticks)
+        ax.tick_params(labelsize=12)
         # region separators: recessive hairlines, one step off the surface
-        ax.axhline(9.5, color='0.6', lw=0.6); ax.axvline(9.5, color='0.6', lw=0.6)
+        ax.axhline(9.5, color='0.6', lw=0.8); ax.axvline(9.5, color='0.6', lw=0.8)
         # region labels centred in each block, off the diagonal, on a white pad so
         # they stay legible over any cell colour
         ax.text(7.5, 2.0, 'trained\npositions', ha='center', va='center',
-                fontsize=7.5, color='0.15', bbox=box)
+                fontsize=12, color='0.15', bbox=box)
         ax.text(12.0, 17.5, 'held-out\npositions', ha='center', va='center',
-                fontsize=7.5, color='0.15', bbox=box)
-    cbar = fig.colorbar(im, ax=axes, fraction=0.015, pad=0.01)
-    cbar.set_label('accuracy', fontsize=8.5)
+                fontsize=12, color='0.15', bbox=box)
+    cbar = fig.colorbar(im, ax=axes, fraction=0.02, pad=0.01)
+    cbar.set_label('accuracy', fontsize=13)
     cbar.set_ticks([0, 0.5, 1.0])
     cbar.set_ticklabels(['0\n(wrong)', '0.5\n(chance)', '1\n(correct)'])
-    cbar.ax.tick_params(labelsize=7)
+    cbar.ax.tick_params(labelsize=11)
     fig.suptitle('Per-position accuracy by encoding, averaged over 10 seeds',
-                 fontsize=12)
+                 fontsize=17)
     p = os.path.join(OUT, 'per_position_multiseed.png')
     fig.savefig(p, dpi=200, bbox_inches='tight')
     plt.close(fig)
