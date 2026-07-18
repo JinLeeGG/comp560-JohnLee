@@ -1,162 +1,179 @@
 # Adjacency — Stage 1: does the setup work at all? (length 6, b=1, T5)
 
-*2026-07-18 · commit `145b254` · John Lee*
+*2026-07-18 · commit `00b0c0c` · John Lee*
 
-> **Main takeaway.** T5 **learns** the task instantly (val 100% by iter ~100) but **held-out
-> accuracy is bimodal across seeds: 100 / 50 / 50 / 50%.** The cause is not T5 and not the
-> background — it is that **length 6 with a half split is a degenerate measurement**. Each
-> half holds only 3 positions, so the training region contains exactly *one* F configuration
-> and the held-out region's only F configuration is the same gap-2 case. All four seeds
-> demonstrably read the **gap** (relative distance), not position. **Stage 2's b sweep should
-> be run at length 10–12, not at length 6.**
-
-### The task
-
-Fixed-length string with `X` once and `Y` once, X always left of Y, all other slots
-background; answer token last. **`T` iff `Y` is immediately after `X` (gap 1), else `F`.**
-
-```
-XY0000:T    (X@0 Y@1, adjacent)        X0Y000:F    (X@0 Y@2, gap)
-```
-
-`b` = number of distinct background token types (b=1 → background is all `0`).
-`t5` = T5 relative position bias (Raffel et al. 2020), the only PE under test here.
+> **Short version.** The model learns the task perfectly, but only **1 of 4 seeds** generalizes
+> to the unseen positions. The reason is not the model and not the background — the training
+> half is too small to define the rule. **Stage 2 (the b sweep) is on hold until we decide
+> what to change.**
 
 ---
 
-## Setup
+## The task
 
-- **data / split:** length 6, b=1 (background `{0}`); `half` split — train/val put both X and
-  Y in positions 0–2, held-out test puts both in 3–5. 20 000 train / 2 000 val / 2 000 test,
-  50/50 T/F in every pool; chance = 50%.
-- **configuration coverage (the crux):** a 3-position half admits only **3** configurations —
-  2 adjacent (T) and **1** gap (F). Train region: `(0,1)T`, `(1,2)T`, `(0,2)F`. Held-out
-  region: `(3,4)T`, `(4,5)T`, `(3,5)F`. At b=1 the whole training set is **3 distinct
-  strings**.
-- **model / config:** `n_layer=3`, `n_head=2`, `n_embd=32`, `block_size=8`, **38 464 params**;
-  `pos_type=t5`, causal. AdamW, lr 1e-3 cosine → 1e-4, warmup 100, batch 64, 2000 iters, CPU.
-- **seeds:** 1337–1340 (init + batch order only; the data split is fixed per b).
-  *The spec called for 1 seed at Stage 1; seed 1337 failed, so 3 more were run to establish
-  whether the failure was seed-specific. It is.*
-- **env:** python 3.9.6 · torch 2.8.0 · numpy 2.0.2 · matplotlib 3.9.4; data `SEED=1337`.
-- **reproduce:**
-  ```bash
-  ../venv/bin/python data/adjacent/prepare.py --b=1
-  for s in 1337 1338 1339 1340; do
-    ../venv/bin/python train.py    config/basic.py --seed=$s
-    ../venv/bin/python evaluate.py config/basic.py --seed=$s
-  done
-  ../venv/bin/python plot.py --curve --b=1 --length=6 --split=half \
-      --out_dir=log/figures --out_name=stage1_learnability_b1.png
-  ../venv/bin/python plot.py --split=half --b=1 --out_dir=log/figures
-  ```
+Is `X` immediately followed by `Y`?
+
+```
+XY0000  ->  T     (X and Y touch)
+X0Y000  ->  F     (something sits between them)
+```
+
+`X` is always to the left of `Y`, so the only question is "touching, or a gap?"
+
+`b` = how many different background characters exist. Here **b=1**, so every background slot
+is `0`. (`b` is the knob this whole experiment is eventually meant to sweep, 1 → 10.)
 
 ---
 
-## Results
+## Run 1: length 6, b=1, T5, half split
 
-**Length 6, `half` split, b=1** — per-class accuracy is what exposes the failure mode:
+**Purpose:** Check that the smallest case works before sweeping `b`. Train with X and Y only
+in the **first half** (positions 0–2); test with them only in the **second half** (positions
+3–5), which the model never sees during training.
 
-| seed | val (in-dist) | held-out **T** (adjacent) | held-out **F** (gap) | held-out overall |
-|---|---|---|---|---|
-| 1337 | 100% | 100% | **0%** | **50.00%** |
-| 1338 | 100% | 100% | 100% | **100.00%** |
-| 1339 | 100% | 100% | **0%** | **50.00%** |
-| 1340 | 100% | 100% | **0%** | **50.00%** |
+**Config:** length 6, b=1, `pos_type=t5`, `half` split, 3 layers / 2 heads / 32 dim =
+**38,464 params**, batch 64, lr 1e-3, 2000 iters, CPU, seeds 1337–1340.
+Train 20,000 / val 2,000 / test 2,000, all 50/50 T/F, so chance = 50%.
 
-Three of four seeds answer `T` on every held-out example. Since the held-out pool is
-class-balanced by construction, that lands exactly at chance — 50% here means *collapsed to
-one label*, not *half right*.
+**Results:**
 
-**Controls:**
-
-| condition | seeds | held-out |
+| seed | did it LEARN? (val) | did it GENERALIZE? (held-out) |
 |---|---|---|
-| length 6, **`none`** split (full distribution), b=1 | 1337–1340 | **100% on 4/4** |
-| **length 12**, `half` split, b=1 | 1337–1340 | **90 / 100 / 95 / 85%** (mean 92.5%) |
+| 1337 | 100% | **50%** |
+| 1338 | 100% | **100%** |
+| 1339 | 100% | **50%** |
+| 1340 | 100% | **50%** |
 
-So the model, the engine, and T5 all handle adjacency fine. Only the *length-6 half split*
-produces the coin flip.
+- All 4 seeds learn the task instantly — 100% val by iteration 100.
+- Only **1 of 4** generalizes. The other 3 answer `T` to *everything* in the unseen half.
+- 50% here does **not** mean "half right". The test set is exactly 50/50 T/F, so answering
+  all-`T` scores exactly 50%. Per-class accuracy shows it: T = 100%, F = 0%.
 
-**Figures** (from `results.csv` / `predictions.csv` / `curves.csv` via `plot.py`):
-
-<img src="figures/stage1_learnability_b1.png" alt="val accuracy vs iteration, 4 seeds, all reaching 100%" width="620">
-
-<img src="figures/per_position_b1_half.png" alt="per-position sweep at length 6, one panel per seed" width="900">
+**Control (no held-out positions):** with the `none` split — X and Y anywhere — all 4 seeds
+score **100%**. So the task, the model, and the engine are all fine. The problem is specific
+to the held-out-position setup.
 
 ---
 
-## Why / interpretation
+## Why this happened
 
-The per-position sweep answers this precisely. Fraction of examples predicted `T`, by gap
-(gold: gap 1 → T, gap ≥ 2 → F), pooled over all positions including untrained ones:
+In the first half there are only **3 possible arrangements**, and only **one** of them is F:
 
-| seed | gap 1 | gap 2 | gap 3 | gap 4 | gap 5 |
+```
+XY0000   ->  T
+0XY000   ->  T
+X0Y000   ->  F     <-- the ONLY F example the model ever sees
+```
+
+At b=1 the entire training set is literally these **3 strings**, repeated.
+
+So "F" is taught by a *single* example. And several different rules explain all 3 examples
+perfectly well:
+
+- "they touch" → T  *(the rule we meant)*
+- "X at position 0 and Y at position 2" → F  *(just memorizing)*
+- "Y at position 2" → F
+
+The model has no way to tell which one we meant, so **which rule it picks is basically luck**
+— 1 in 4 here. The test half has the same weakness: its only F case is `000X0Y`, which is the
+same shape (gap 2) as the single memorized example.
+
+### Good news: the model reads the *gap*, not the positions
+
+Fraction of `T` answers by gap, across all positions including untrained ones
+(correct answer: `T` only for gap 1):
+
+| seed | gap 1 | **gap 2** | gap 3 | gap 4 | gap 5 |
 |---|---|---|---|---|---|
-| 1337 | 1.00 | 0.75 | 0.00 | 0.00 | 0.00 |
-| 1338 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| 1339 | 1.00 | 0.50 | 0.00 | 0.00 | 0.00 |
-| 1340 | 1.00 | 0.50 | 0.00 | 0.00 | 0.00 |
+| 1337 | 1.00 ✅ | **0.75 ❌** | 0.00 ✅ | 0.00 ✅ | 0.00 ✅ |
+| 1338 | 1.00 ✅ | **0.00 ✅** | 0.00 ✅ | 0.00 ✅ | 0.00 ✅ |
+| 1339 | 1.00 ✅ | **0.50 ❌** | 0.00 ✅ | 0.00 ✅ | 0.00 ✅ |
+| 1340 | 1.00 ✅ | **0.50 ❌** | 0.00 ✅ | 0.00 ✅ | 0.00 ✅ |
 
-Two things follow, and they matter more than the headline number:
+Every seed gets gaps 1, 3, 4 and 5 right **everywhere**, including position pairs never seen
+in training. They disagree only on **gap 2** — the one case taught by a single example.
 
-1. **T5 is reading relative distance, not position — no shortcut.** Every seed answers `F` on
-   *every* gap-3/4/5 configuration, including position pairs never seen in training, and `T`
-   on every gap-1 pair. Accuracy is constant along constant-gap diagonals, which is the
-   distance signature the spec said to look for; there are no position blocks. The shortcut
-   the spec flagged as a risk **did not occur** — consistent with T5's bias being relative and
-   gap 1 being its finest bucket.
+This is exactly what we hoped for: T5 is measuring the *distance* between X and Y, not their
+absolute positions. The position shortcut the spec warned about **did not happen**.
 
-2. **The whole result rides on one under-determined decision: gap 2 → F.** In the training
-   region gap 2 occurs in exactly *one* configuration, `X@0,Y@2`. All four seeds get that
-   specific configuration right (0/40 predicted T). They differ only on whether "gap 2 → F"
-   *transfers* to the other gap-2 placements — and the held-out region's only F case is
-   `X@3,Y@5`, a gap-2 placement. So held-out F accuracy, and therefore the entire held-out
-   score, is decided by a single generalization step supported by a single training example.
-   Whether a seed takes that step is effectively a lottery (1/4 here).
+**Output:**
 
-The training region simply does not identify the rule: `"gap = 1"`, `"gap ≤ 2 except X@0,Y@2"`,
-and several position rules all fit those 3 configurations perfectly. No model can be expected
-to pick the intended one reliably, and **which one it picks is what the length-6 half split
-measures** — not background sensitivity.
+<img src="figures/stage1_learnability_b1.png" alt="val accuracy vs iteration for 4 seeds, all reaching 100% by iteration 100" width="620">
 
-The length-12 control confirms this (**hypothesis → confirmed**): a 6-position half admits
-gaps 1–5 across 15 configurations (5 T, 10 F spanning four distinct gap values), the rule is
-identified, and held-out accuracy rises to 85–100% with no bimodal collapse. The residual
-errors there are still gap-2 cells, at the far end of the held-out region — the same
-fragility, now a minor effect rather than the whole signal.
+<img src="figures/per_position_b1_half.png" alt="per-position accuracy heatmap, one panel per seed" width="900">
 
-## Consequence for the experiment plan
+*(In the heatmap, red cells are errors. They sit on constant-gap diagonals, not in position
+blocks — that is the "reads distance" signature.)*
 
-**Stage 2's b sweep must not be run at length 6.** Its held-out metric is dominated by one
-fragile configuration and is bimodal across seeds, so it has no resolution left to show a
-background effect: a drop from b=1 to b=10 would be indistinguishable from the seed lottery.
-The spec's staging (Stage 2 b-sweep at length 6, then Stage 3 length scaling) should be
-**inverted for this task** — scale length first, then sweep b at length 10–12.
+---
 
-This does not invalidate the spec's reasoning; the small-halves caveat was anticipated there
-("expected and fine … a small count here is normal"). What the run adds is that the small
-count is not merely a coverage cosmetic — it removes the measurement's ability to answer the
-question being asked.
+## Conclusion
 
-## Caveats / limitations
+**What worked**
 
-- 4 seeds; with a bimodal 50/100 outcome, the "1 in 4 generalize" rate is a very rough
-  estimate (a 95% interval on 1/4 spans roughly 1–70%). The qualitative bimodality is solid;
-  the *rate* is not.
-- One fixed data split per (b, seed) — seeds vary initialization and batch order only, so the
-  variance reported here understates true run-to-run variance.
-- The length-12 control is 4 seeds at b=1 only; it establishes that the degeneracy is the
-  cause, not that length 12 is the right operating point for the whole sweep.
-- Val accuracy is saturated (100% everywhere), so it carries no information at this stage
-  beyond "learning is not the bottleneck".
+- The whole pipeline runs end to end: data → train → evaluate → figures.
+- The model learns adjacency instantly, and gets 100% when training covers all positions.
+- T5 reads relative distance, not absolute position — no shortcut. This is evidence *against*
+  the original worry that T5 gets lost in background noise.
 
-## Next
+**What didn't work**
 
-1. Re-run Stage 1's gate at **length 12** (`--block_size=14`) as the new anchor, with 10+
-   seeds to get an honest variance on held-out.
-2. Then run the **b sweep at length 12**, b = 1…10, 10+ seeds per b — the configuration that
-   can actually resolve a background effect.
-3. Keep the per-position heatmap in the loop at each b: the gap-vs-position diagnostic is
-   what would catch a shortcut appearing at high b, which is exactly where one would expect
-   background noise to push the model toward one.
+- Generalization to held-out positions is a **coin flip** (1 of 4 seeds), because the length-6
+  training half only contains one F example.
+- **Stage 1 does not pass its gate, so Stage 2 was not started.** Running the b sweep at
+  length 6 would not answer anything: a drop from b=1 to b=10 would be indistinguishable from
+  this seed lottery.
+
+**Decision needed before continuing** — none of these are tested yet:
+
+1. **Lengthen the input** (8/10/12) so each half contains several different gaps. Most obvious
+   fix, but it reorders the staging agreed in the spec — worth asking the advisor.
+2. **Keep length 6, change the split** — e.g. hold out one position at a time instead of a
+   whole half, so training keeps more than one F arrangement.
+3. **Keep length 6, run 10+ seeds per b** and treat the *rate* of generalization as the
+   measurement, instead of any single run.
+
+---
+
+## Caveats
+
+- **4 seeds is too few.** With a 1-of-4 outcome, the true rate could be anywhere from ~1% to
+  ~81% (exact 95% interval). The coin-flip behaviour is solid; the *number* 1-in-4 is not.
+- **The fix is untested.** This log explains why length 6 can't measure a background effect.
+  It does not show what *can* — all three options above are guesses.
+- **Only b=1 was run.** The b sweep hasn't started, so nothing here says anything yet about
+  whether background diversity actually affects T5.
+- Training is not perfectly stable: 3 of 4 seeds briefly dip to 50% once before recovering
+  (visible as spikes in the curve). With only 3 distinct training strings that is expected,
+  and best-val checkpointing means it doesn't affect the numbers above.
+- Seeds change initialization and batch order only — the data split is fixed — so the real
+  run-to-run variance is larger than shown.
+
+---
+
+## Reproduce
+
+```bash
+# main result
+../venv/bin/python data/adjacent/prepare.py --b=1
+for s in 1337 1338 1339 1340; do
+  ../venv/bin/python train.py    config/basic.py --seed=$s
+  ../venv/bin/python evaluate.py config/basic.py --seed=$s
+done
+
+# control: no held-out positions
+../venv/bin/python data/adjacent/prepare.py --b=1 --split=none
+for s in 1337 1338 1339 1340; do
+  ../venv/bin/python train.py    config/basic.py --seed=$s
+  ../venv/bin/python evaluate.py config/basic.py --seed=$s
+done
+
+# figures (restore the main data first)
+../venv/bin/python data/adjacent/prepare.py --b=1
+../venv/bin/python plot.py --curve --b=1 --length=6 --split=half \
+    --out_dir=log/figures --out_name=stage1_learnability_b1.png
+../venv/bin/python plot.py --split=half --b=1 --out_dir=log/figures
+```
+
+Raw data behind every number above: `results.csv`, `predictions.csv`, `curves.csv`.
+Environment: python 3.9.6 · torch 2.8.0 · numpy 2.0.2 · matplotlib 3.9.4; data `SEED=1337`.

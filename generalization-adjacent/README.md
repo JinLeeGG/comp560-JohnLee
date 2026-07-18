@@ -110,12 +110,14 @@ Every `results.csv` row carries **both** numbers, and they must be read together
   is the same gap-2 case. The diagnostic sweep shows all four seeds read the **gap**
   correctly (gap ≥ 3 → F everywhere, including untrained positions — no position shortcut);
   they differ only on whether gap-2 → F transfers away from the single memorized instance.
-- **Confirmation:** at **length 12** the same config gives held-out 85 / 95 / 100 / 85%
-  (no bimodal collapse), and the `none` split at length 6 gives 100% on 4/4 seeds.
-- **Therefore: run the `b` sweep at length 10–12, not length 6.** The staging in the original
-  spec has Stage 3 (length scaling) after Stage 2 (the b sweep); for this task that order
-  needs to be inverted, because the length-6 "debugging anchor" cannot measure a background
-  effect — its held-out score is dominated by a single fragile configuration.
+- **Control:** the `none` split at length 6 gives 100% on 4/4 seeds, so the task, model and
+  engine are fine — the coin flip is specific to the held-out-position setup.
+- **Stage 2 is not started.** Running the b sweep at length 6 as specified would not answer the
+  question: the held-out metric is decided by one fragile configuration, so a b=1→10 drop
+  would be indistinguishable from the seed lottery. **What to change is an open decision** —
+  the log lists three untested options (lengthen the input, change the split shape, or run
+  enough seeds to measure the generalization *rate*). Option 1 reorders the spec's agreed
+  staging, so it is worth raising with the advisor rather than assuming.
 
 ## Caveats
 
