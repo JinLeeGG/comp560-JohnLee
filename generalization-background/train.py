@@ -1,5 +1,5 @@
 """
-Training loop for the from-scratch micro-transformer (adjacency task, background sweep).
+Training loop for the from-scratch micro-transformer (distance-1 task, background sweep).
 
 Same engine and structure as generalization-distd / evenodd / order; only the data dir,
 the model size, and the extra `b` bookkeeping differ. The two deliberate departures from the
@@ -25,7 +25,7 @@ Two additions specific to this experiment:
     curve is recorded rather than left to scroll past in the terminal.
     (plot.py --curve draws it.)
 
-Usage (from generalization-adjacent/):
+Usage (from generalization-background/):
     ../venv/bin/python train.py config/basic.py --seed=1337
     ../venv/bin/python train.py config/basic.py --max_iters=500 --pos_type=rope
 """
@@ -46,7 +46,7 @@ from model import MicroTransformer, MicroTransformerConfig
 
 # ---------------------------- config (overridable) ----------------------------
 out_dir = 'out'
-data_dir = 'data/adjacent'
+data_dir = 'data/background'
 eval_interval = 100
 log_interval = 100
 

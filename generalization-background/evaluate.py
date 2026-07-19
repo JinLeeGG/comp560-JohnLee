@@ -1,16 +1,16 @@
 """
-Evaluation script for the adjacency task (from-scratch micro-transformer engine).
+Evaluation script for the distance-1 task (from-scratch micro-transformer engine).
 
-Reads the held-out test examples (data/adjacent/test.txt), feeds each '<LENGTH chars>:'
+Reads the held-out test examples (data/background/test.txt), feeds each '<LENGTH chars>:'
 prompt to the model, reads the argmax at the answer position (the token after ':'), and
 checks it against the gold T/F label.
 
-    LABEL MAPPING (must match prepare.py):  T iff Y sits immediately after X (adjacent,
-    gap 1); F otherwise (a gap between them). X is always to the left of Y.
+    LABEL MAPPING (must match prepare.py):  T iff the X-Y distance is exactly 1; F for any
+    larger distance. X is always to the left of Y.
 
-Because the task is binary, chance is 50%. We report PER-CLASS accuracy (T = adjacent,
-F = gap), not just overall: a model that always outputs one label scores 50% overall, and
-per-class accuracy is what makes that failure mode visible.
+Because the task is binary, chance is 50%. We report PER-CLASS accuracy (T = distance 1,
+F = larger distance), not just overall: a model that always outputs one label scores 50%
+overall, and per-class accuracy is what makes that failure mode visible.
 
 SUCCESS HERE IS TWO NUMBERS, NOT ONE. Every row records both:
     val_acc     -- in-distribution: did the model LEARN the task on trained positions?
@@ -31,7 +31,7 @@ accumulate:
                       split, so figures are comparable across runs.
 
     Note on the per-position heatmap: with only 3 configurations per half at length 6,
-    "adjacent vs gap" is perfectly correlated with a position lookup inside the training
+    "distance 1 vs larger" is perfectly correlated with a position lookup inside the training
     region, so a model could win there without ever comparing X to Y. GAP structure
     (accuracy constant along the diagonal, i.e. all gap-1 cells alike) = the model reads
     relative distance; accuracy tracking WHERE Y sits = a position shortcut. For T5 we
@@ -42,9 +42,9 @@ accumulate:
 them), not from whatever data currently sits on disk, so a re-prepared data dir cannot
 silently mislabel a results row. A mismatch is reported loudly.
 
-Usage (from generalization-adjacent/):
+Usage (from generalization-background/):
     ../venv/bin/python evaluate.py config/basic.py --seed=1337
-    ../venv/bin/python evaluate.py config/basic.py --test_file=data/adjacent/test.txt
+    ../venv/bin/python evaluate.py config/basic.py --test_file=data/background/test.txt
 """
 import os
 import sys
@@ -60,7 +60,7 @@ from model import MicroTransformer, MicroTransformerConfig
 
 # ----- config (overridable by the config file + --key=value args) -----
 out_dir = 'out'
-data_dir = 'data/adjacent'
+data_dir = 'data/background'
 test_file = ''          # if empty, defaults to <data_dir>/test.txt
 device = 'cpu'
 seed = 1337
@@ -155,7 +155,7 @@ with open(test_file) as f:
 if num_test:
     examples = examples[:num_test]
 
-counts = {'T': [0, 0], 'F': [0, 0]}   # label -> [correct, total]  (T=adjacent, F=gap)
+counts = {'T': [0, 0], 'F': [0, 0]}   # label -> [correct, total]  (T=distance 1, F=larger)
 nonbinary = 0
 errors = []
 bodies = [e.split(':')[0] for e in examples]
@@ -178,7 +178,7 @@ heldout_T_acc = cT / tT if tT else 0.0
 heldout_F_acc = cF / tF if tF else 0.0
 
 # report
-print("=== adjacency Evaluation ===")
+print("=== distance-1 task Evaluation ===")
 print(f"test_file: {test_file}")
 print(f"pos_type : {pos_type} | causal: {causal} | t5_bias_mode: {t5_bias_mode} | "
       f"split: {split} ({split_detail}) | length={LENGTH} | b={B} | seed: {train_seed}")
@@ -187,9 +187,9 @@ print(f"val acc  : {val_acc:.2%}   (in-distribution -- did it LEARN?)"
       if val_acc is not None else "val acc  : (not in ckpt)")
 print(f"examples : {total}   (chance = 50%)")
 if tT:
-    print(f"T (adjacent, gap=1): {cT}/{tT} = {heldout_T_acc:.2%}")
+    print(f"T (distance 1)     : {cT}/{tT} = {heldout_T_acc:.2%}")
 if tF:
-    print(f"F (gap > 1)       : {cF}/{tF} = {heldout_F_acc:.2%}")
+    print(f"F (distance > 1)   : {cF}/{tF} = {heldout_F_acc:.2%}")
 if total:
     print(f"OVERALL (held-out) : {correct}/{total} = {heldout_acc:.2%}   (did it GENERALIZE?)")
 if nonbinary:
@@ -220,7 +220,7 @@ def build_sweep(per_pair, length, background, sweep_seed=0):
     sweep with b=10 noise would be off-distribution for a b=1 model and would measure the
     wrong thing.
 
-    Not class-balanced (gap pairs vastly outnumber adjacent pairs), which is fine: every
+    Not class-balanced (larger-distance pairs vastly outnumber distance-1 pairs), which is fine: every
     figure built from it conditions on (x, y) or on the gap, so overall balance is
     irrelevant. Deterministic, so figures are comparable across runs and seeds."""
     rng = random.Random(sweep_seed)

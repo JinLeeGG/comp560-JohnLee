@@ -1,18 +1,18 @@
 """
-Adjacency task data generator, with BACKGROUND DIVERSITY (b) as the swept knob.
+Distance-1 task data generator, with BACKGROUND DIVERSITY (b) as the swept knob.
 
 Task: a fixed-length string containing X exactly once and Y exactly once, with X ALWAYS to
 the left of Y (never Y...X). Every other slot is a background token. The model reads the
 string, sees ':', and must output a SINGLE token:
 
     LABEL MAPPING (fixed -- never flip this):
-        T  if  Y sits immediately after X   (adjacent, gap = 1)
+        T  if  Y sits immediately after X   (distance 1)
         F  otherwise                        (something sits between them, gap > 1)
 
-    0XY000:T   <- X@1 Y@2  gap 1  -> adjacent -> T
+    0XY000:T   <- X@1 Y@2  distance 1 -> T
     X00Y00:F   <- X@0 Y@3  gap 3  -> a gap    -> F
 
-Since X is always before Y, the label is purely "are they adjacent, or is there a gap".
+Since X is always before Y, the label is purely "is the distance 1, or larger".
 The task is deliberately EASY: it is not meant to be the bottleneck -- the background is.
 
 Why this task exists (the point of the whole experiment)
@@ -40,12 +40,12 @@ distribution shift is over WHERE X and Y may appear, controlled by SPLIT:
 
     SPLIT='half'   train/val : BOTH X and Y in the FIRST half   (length 6 -> 0..2)
                    test      : BOTH X and Y in the SECOND half  (length 6 -> 3..5)
-                   Having learned "adjacent vs gap" in the first half, does the model still
+                   Having learned "distance 1 vs larger" in the first half, does the model still
                    do it in unseen second-half positions?
 
 SMALL HALVES AT LENGTH 6 -- EXPECTED, NOT A BUG
 -----------------------------------------------
-A contiguous region of size R admits R-1 adjacent (T) configurations and C(R,2)-(R-1) gap
+A contiguous region of size R admits R-1 distance-1 (T) configurations and C(R,2)-(R-1) gap
 (F) configurations. At LENGTH=6 each half is only R=3 positions, so each pool has just
 3 position configurations: 2 T (e.g. X@3Y@4, X@4Y@5) and 1 F (X@3Y@5). That is a known and
 accepted property of the length-6 DEBUGGING anchor -- coverage grows in Stage 3 (length
@@ -53,7 +53,7 @@ accepted property of the length-6 DEBUGGING anchor -- coverage grows in Stage 3 
 
 SHORTCUT CONFOUND to watch (read this before believing a high score)
 --------------------------------------------------------------------
-With only 3 configurations in the training region, "adjacent vs gap" is perfectly
+With only 3 configurations in the training region, "distance 1 vs larger" is perfectly
 correlated with a pure POSITION lookup: in 0..2 the only F is exactly (X@0, Y@2), so a model
 can score 100% in-distribution by memorizing "F iff X@0 and Y@2" without ever comparing X
 and Y. Two things guard against reading that as success:
@@ -63,13 +63,13 @@ and Y. Two things guard against reading that as success:
     the GAP (constant along the diagonal) = the model reads relative distance; accuracy
     tracking WHERE Y sits = a position shortcut.
 For T5 the shortcut risk is low in principle -- its bias is relative-distance based, and
-adjacency is gap=1, which its fine-grained near buckets capture exactly -- but that is an
+the T case is distance 1, which its fine-grained near buckets capture exactly -- but that is an
 expectation, so verify it on the heatmap rather than assuming it.
 
 Config is overridable from the command line (poor-man's configurator, same pattern as
 train.py / evaluate.py):
-    ../venv/bin/python data/adjacent/prepare.py --b=1
-    ../venv/bin/python data/adjacent/prepare.py --b=10 --length=12 --split=half
+    ../venv/bin/python data/background/prepare.py --b=1
+    ../venv/bin/python data/background/prepare.py --b=10 --length=12 --split=half
 
 Outputs (in this folder):
     train.bin / val.bin  : flat token streams, one example per line (uint16); val uses the
@@ -132,7 +132,7 @@ np.random.seed(SEED)
 
 
 def label_for(x, y):
-    """The fixed label rule: T iff Y sits immediately after X (adjacent), else F."""
+    """The fixed label rule: T iff the X-Y distance is exactly 1, else F."""
     return 'T' if y == x + 1 else 'F'
 
 
@@ -273,7 +273,7 @@ def check_examples(examples):
         x, y = xy_positions(body)
         assert x < y, f"X must be left of Y (never Y...X): X@{x} Y@{y}  {e!r}"
         assert label_for(x, y) == label, \
-            f"label/adjacency mismatch: X@{x} Y@{y} gap={y - x} label={label}  {e!r}"
+            f"label/distance mismatch: X@{x} Y@{y} gap={y - x} label={label}  {e!r}"
         for i, c in enumerate(body):
             if i not in (x, y):
                 assert c in BACKGROUND, \
@@ -299,11 +299,11 @@ def rule_str(role):
     return f"both X,Y in {region}"
 
 
-print("=== adjacency data prepared ===")
+print("=== distance-1 task data prepared ===")
 print(f"SPLIT={SPLIT}  LENGTH={LENGTH}  b={B}  SEED={SEED}")
 print(f"background set: {list(BACKGROUND)}  ({B} token type{'s' if B > 1 else ''})")
 print(f"vocab_size={vocab_size}  chars={[repr(c) for c in vocab_chars]}")
-print("label rule    : T iff Y is immediately after X (gap 1), else F")
+print("label rule    : T iff the X-Y distance is exactly 1, else F")
 print(f"train/val rule: {rule_str('train')}")
 print(f"test     rule : {rule_str('test')}")
 print()
@@ -316,7 +316,7 @@ for name, ex, role in [('train', train_examples, 'train'),
     t, fa = class_balance(ex)
     cfgs = sorted({xy_positions(e.split(':')[0]) for e in ex})
     n_t_cfg = sum(1 for c in cfgs if label_for(*c) == 'T')
-    print(f"{name:5s}: {len(ex):>6d} examples | T(adjacent)={t} F(gap)={fa} ({t / len(ex):.1%} T)"
+    print(f"{name:5s}: {len(ex):>6d} examples | T(dist=1)={t} F(gap)={fa} ({t / len(ex):.1%} T)"
           f" | {len(cfgs)} configs ({n_t_cfg} T, {len(cfgs) - n_t_cfg} F)"
           f" | {len(set(ex))} distinct examples")
 print("X-before-Y, label-correctness and background-set assertions passed for all pools")
@@ -328,7 +328,7 @@ print()
 print(f"held-out test pool, per-configuration coverage ({rule_str('test')}):")
 print("  X@ , Y@  gap : count  (label)")
 for (x, y), (cnt, label) in sorted(test_per_config.items()):
-    kind = 'T adjacent' if label == 'T' else 'F gap     '
+    kind = 'T dist=1'   if label == 'T' else 'F gap     '
     print(f"  X@{x:<2} Y@{y:<2} gap={y - x:<2}: {cnt:>5}  ({kind})")
 t, fa = class_balance(test_examples)
 print(f"  class totals: T={t}  F={fa}  -> exact 50/50 = {t == fa}")
@@ -344,7 +344,7 @@ def show(examples, k=6):
     for e in examples[:k]:
         body, label = e.split(':')
         x, y = xy_positions(body)
-        kind = 'adjacent' if y == x + 1 else 'gap     '
+        kind = 'dist=1  ' if y == x + 1 else 'gap     '
         print(f"  X@{x:>2} Y@{y:>2}  gap={y - x:>2} ({kind}) -> {label}   {e}")
 
 

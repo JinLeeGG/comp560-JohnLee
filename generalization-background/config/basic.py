@@ -1,10 +1,10 @@
-# Config for the adjacency task ("is X immediately before Y?") on the from-scratch
+# Config for the distance-1 task ("is X immediately before Y?") on the from-scratch
 # micro-transformer engine.
 #
 # Same engine as generalization-distd / evenodd / order / detect (model.py + pos_encoding.py
 # + train.py in this folder); only the data and this config are task-specific. Here the
 # single independent variable is NOT the positional encoding -- it is `b`, the background
-# diversity, which lives in the data (data/adjacent/prepare.py --b=N). `pos_type` is pinned
+# diversity, which lives in the data (data/background/prepare.py --b=N). `pos_type` is pinned
 # to t5 by design: this is a T5 stress test, not a PE comparison.
 #
 # Loaded by both train.py and evaluate.py via their inline configurator:
@@ -12,7 +12,7 @@
 #     ../venv/bin/python evaluate.py config/basic.py --seed=1337
 
 out_dir = 'out'
-data_dir = 'data/adjacent'
+data_dir = 'data/background'
 eval_interval = 100      # denser than the length-20 tasks: this model converges fast, and
 log_interval = 100       # the val curve is what gates Stage 1
 
@@ -26,7 +26,7 @@ causal = True            # True = decoder mask; False = bidirectional attention 
 t5_bias_mode = 'auto'    # 'auto' follows causal; use 'causal' for mask-only T5 ablation
 
 # --- model: deliberately SMALL (MacCormick's 6/30 note) ---
-# Length 6 is short and adjacency is easy, so the length-20 micro model (~0.80M) would be
+# Length 6 is short and the task is easy, so the length-20 micro model (~0.80M) would be
 # oversized -- it could hit 100% at every b and hide the background effect entirely. This is
 # ~0.03M params, which keeps headroom limited enough for a b effect to show, and is fast
 # enough for the many (b x seed) runs of Stage 2.
