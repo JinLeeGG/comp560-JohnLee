@@ -7,13 +7,23 @@ Reads (written by train.py and evaluate.py):
   - predictions.csv  per-example diagnostic sweep        -> per-position heatmaps (the why)
   - curves.csv       the val curve of every run          -> Stage 1's learnability gate
 
-Produces (PNG, 150 DPI, into out/):
-  - accuracy_vs_b_<split>.png        THE HEADLINE. x = b (background diversity), y = accuracy,
-    (len{N} in the name for      two lines: in-distribution val and held-out test, mean over
-     lengths other than 6)       seeds with error bars, chance line at 50%. Read it as:
-                                   both lines high and flat  -> background is NOT T5's problem
-                                   held-out drops, val high   -> background hurts GENERALIZATION
-                                   both drop                  -> background hurts LEARNING
+Produces (PNG, 150 DPI, into --out_dir):
+  - run_grid_b<N>_<split>.png        (--grid) every run as one labelled square, rows = input
+                                     length. Counts and individual values read off the same
+                                     picture, and the SHAPE of a row shows at a glance whether
+                                     the runs split into two clumps or sit on a continuum.
+                                     This is the figure the Stage 1 log uses.
+  - accuracy_vs_b_<split>.png        (--vs_b) x = b (background diversity), y = accuracy, two
+    (len{N} for lengths != 6)        lines: in-distribution val and held-out. Read it as:
+                                       both high and flat     -> background is NOT T5's problem
+                                       held-out drops only    -> background hurts GENERALIZATION
+                                       both drop              -> background hurts LEARNING
+                                     Waiting on the sweep actually being run.
+  - accuracy_vs_length_b<N>_<split>.png  (--vs_length) accuracy and outcome mix against input
+                                     length. Superseded by --grid for the log, kept because it
+                                     shows the per-length distribution on a common axis.
+  - decay_with_distance_len<N>_b<N>.png  (--decay) error rate against how far a test case sits
+                                     beyond the training region, one line per X-Y distance.
   - per_position_b<N>_<split>.png    accuracy over (x_pos, y_pos) pairs for one b, ONE PANEL
                                      PER SEED plus a pooled panel. The per-seed panels are
                                      not decoration: a pooled average can manufacture
@@ -21,16 +31,18 @@ Produces (PNG, 150 DPI, into out/):
                                      collapsing to opposite labels average into a clean-
                                      looking pattern), so mechanism claims must be read off
                                      the per-seed panels.
-  - learnability_b<N>.png            (--curve) val accuracy vs iteration, one line per seed.
-                                     Stage 1's gate: flat at 50% = it cannot learn the task;
-                                     climbing = good. Also shows whether max_iters is
-                                     wastefully long.
+  - learnability_b<N>_<split>.png    (--curve) val accuracy vs iteration, one line per seed.
+                                     Shows how fast training converges and any instability
+                                     afterwards. Also shows whether max_iters is wastefully
+                                     long.
 
 Usage (from generalization-background/):
-    ../venv/bin/python plot.py --split=half --vs_b        # headline accuracy-vs-b
-    ../venv/bin/python plot.py --split=half               # per-position heatmaps (all b present)
-    ../venv/bin/python plot.py --curve --b=1              # Stage 1 learnability curve
-    ../venv/bin/python plot.py --split=half --vs_b --out_dir=log/figures
+    ../venv/bin/python plot.py --split=half --b=1 --grid --out_dir=log/figures
+    ../venv/bin/python plot.py --split=half --b=1 --vs_length
+    ../venv/bin/python plot.py --split=half --vs_b
+    ../venv/bin/python plot.py --split=half --b=1 --length=12 --decay
+    ../venv/bin/python plot.py --split=half                    # per-position heatmaps
+    ../venv/bin/python plot.py --curve --b=1 --length=6 --split=half
 """
 import os
 import csv
@@ -205,7 +217,7 @@ def plot_vs_length(split, out_dir, b=1, out_name=''):
     ax.text(x[0] - 0.42, CHANCE + 1.4, '50% = gives the same answer to everything',
             va='bottom', ha='left', fontsize=9, color='#555555', style='italic')
     ax.set_ylim(44, 106)
-    ax.set_ylabel('accuracy on UNSEEN positions (%)', fontsize=10)
+    ax.set_ylabel('accuracy in held-out positions (%)', fontsize=10)
     ax.set_title('How well did each run do?', fontsize=12, fontweight='bold')
     ax.legend(loc='center left', fontsize=9, framealpha=0.95)
 
@@ -558,7 +570,7 @@ def plot_run_grid(split, out_dir, b=1, out_name=''):
     for s in ax.spines.values():
         s.set_visible(False)
     ax.tick_params(length=0)
-    ax.set_title('Accuracy on positions never seen in training — one square per run',
+    ax.set_title('Accuracy in held-out positions — one square per run',
                  fontsize=13, fontweight='bold', pad=12)
     # Training success is deliberately a sentence, not a per-cell number: every run reached
     # 100% on trained positions at either iteration 100 or 200, and eval_interval is 100, so
@@ -566,7 +578,7 @@ def plot_run_grid(split, out_dir, b=1, out_name=''):
     # resolution the data does not have.
     ax.text(0, -0.10,
             f'{ncol} runs per length, sorted low to high.   '
-            '50 = no better than guessing (one label for everything)   ·   100 = all correct',
+            '50 = chance, reached by answering a single label everywhere.',
             fontsize=9.5, color='#555555', va='top')
     ax.text(0, -0.34,
             f'Learning was never the problem: all {ncol * len(lengths)} runs reached 100% on '

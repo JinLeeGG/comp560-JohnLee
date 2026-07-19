@@ -2,7 +2,7 @@
 
 *2026-07-18 · John Lee · code, data and figures are committed together with this log*
 
-> **Short version.** The model learns the task every time, but carries it to unseen positions
+> **Short version.** The model learns the task every time, but carries it to held-out positions
 > only unreliably. At length 6, **9 of 10 runs fail completely.** Longer inputs remove that
 > complete failure — at length 12 **no run collapses** and the worst is 75% — but only **4 of
 > 10** are fully correct. **Stage 1 does not pass**, so the background sweep it was meant to set
@@ -79,8 +79,8 @@ seeds 1337–1346. Train 20,000 / val 2,000 / test 2,000, all 50/50 T/F, so chan
 **Results:**
 
 - **Learning always works:** all 10 runs hit 100% on the trained positions by iteration 100.
-- **Generalizing usually does not:** only **1 of 10** runs (seed 1338) scored 100% on the
-  unseen positions. The other **9 answered `T` to everything**, which scores exactly 50%.
+- **Generalizing usually does not:** only **1 of 10** runs (seed 1338) scored 100% in the
+  held-out positions. The other **9 answered `T` to everything**, which scores exactly 50%.
 - No run landed in between — it was 50% or 100%, nothing else.
 
 One structural fact worth noting: at length 6 each half has only 3 positions, so there is
@@ -132,8 +132,8 @@ half.*
 
 <img src="figures/run_grid_b1_half.png" alt="grid of 40 coloured squares, ten per input length, each labelled with that run's held-out accuracy" width="100%">
 
-*Every square is one run, labelled with its accuracy on unseen positions and coloured red (50,
-chance) to green (100). Runs are sorted within each row, so the column position carries no
+*Every square is one run, labelled with its accuracy in the held-out positions and coloured red
+(50, chance) to green (100). Runs are sorted within each row, so the column position carries no
 meaning — the **shape of each row** does. Length 6 splits cleanly into nine reds and one green,
 with nothing in between; length 12 is a smooth gradient from 75 to 100 with no reds at all.
 That difference in shape, not the difference in average, is what makes length 12 usable as a
