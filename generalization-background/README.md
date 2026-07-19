@@ -55,7 +55,7 @@ data/background/prepare.py   # data gen; b, length, split are all arguments
 config/basic.py            # small model (n_embd=32, n_head=2, n_layer=3), pos_type=t5
 train.py                   # per-example batching, answer-token-only loss; logs curves.csv
 evaluate.py                # logs results.csv (with a b column) + predictions.csv
-plot.py                    # accuracy-vs-b, per-position heatmaps, learnability curves
+plot.py                    # run grid, accuracy-vs-b / vs-length, heatmaps, learning curves
 log/                       # one polished report per stage, figures under log/figures/
 ```
 
@@ -82,9 +82,11 @@ for b in 1 2 3 4 5 6 7 8 9 10; do
 done
 
 # figures
-../venv/bin/python plot.py --split=half --vs_b --out_dir=log/figures   # headline
-../venv/bin/python plot.py --split=half --out_dir=log/figures          # per-position heatmaps
-../venv/bin/python plot.py --curve --b=1 --length=6 --split=half       # learnability curve
+../venv/bin/python plot.py --split=half --b=1 --grid --out_dir=log/figures  # every run, one square
+../venv/bin/python plot.py --split=half --vs_b --out_dir=log/figures        # accuracy vs b
+../venv/bin/python plot.py --split=half --b=1 --vs_length --out_dir=log/figures  # accuracy vs length
+../venv/bin/python plot.py --split=half --out_dir=log/figures               # per-position heatmaps
+../venv/bin/python plot.py --curve --b=1 --length=6 --split=half            # learning curves
 ```
 
 **Lengths other than 6 need a bigger `block_size`** (`length + 2`): pass

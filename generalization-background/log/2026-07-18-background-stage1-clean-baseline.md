@@ -71,9 +71,10 @@ Run 2, admit larger distances.
 
 **Purpose:** Confirm the smallest case works before touching `b`.
 
-**Config:** length 6, b=1, `pos_type=t5`, `half` split, 3 layers / 2 heads / 32 dim =
-38,464 params, batch 64, lr 1e-3, 2000 iterations, CPU, seeds 1337–1346.
-Train 20,000 / val 2,000 / test 2,000, all 50/50 T/F, so chance = 50%.
+**Config:** length 6, b=1, `pos_type=t5` with **causal (decoder) masking** — the repo also
+supports `causal=False`, and T5 behaves differently there, so this is worth stating — `half`
+split, 3 layers / 2 heads / 32 dim = 38,464 params, batch 64, lr 1e-3, 2000 iterations, CPU,
+seeds 1337–1346. Train 20,000 / val 2,000 / test 2,000, all 50/50 T/F, so chance = 50%.
 
 **Results:**
 
@@ -87,18 +88,14 @@ exactly **one way to place an `F` pair** in the training half (X at 0, Y at 2). 
 training examples all show that same placement. *Whether that is what causes the failure was
 not tested here — see [Caveats](#caveats).*
 
-**Output:**
+These 10 runs are the top row of the figure after Run 2.
 
-<img src="figures/stage1_learnability_b1.png" alt="validation accuracy against training iteration for 10 runs, all reaching 100% by iteration 100" width="100%">
-
-*All 10 runs reach 100% on the **trained** positions by iteration 100. Learning was never the
-bottleneck — the problem is entirely about carrying it to unseen positions.*
-
-> **On the dips in the curve.** Training is not perfectly stable afterwards: four runs briefly
-> fall back to answering one label. Three recover within a single evaluation point (seeds 1337,
-> 1338, 1339); seed 1341 sits at 50% from iteration 600 to 800 and 75% at 900 before returning
-> to 100% by 1000. With only three distinct training strings this is expected, and since the
-> checkpoint is taken at best validation accuracy it does not affect any number reported here.
+> **A note on training stability.** Every run reaches 100% on the trained positions almost
+> immediately, but four of them briefly fall back to answering one label afterwards. Three
+> recover within a single evaluation point (seeds 1337, 1338, 1339); seed 1341 sits at 50% from
+> iteration 600 to 800 and 75% at 900 before returning to 100% by 1000. With only three distinct
+> training strings this is expected, and since the checkpoint is taken at best validation
+> accuracy it does not affect any number reported here.
 
 ---
 
@@ -131,15 +128,16 @@ half.*
 - **Length 12 is nonetheless the best-behaved:** worst run 75% rather than 50%, and the narrowest
   spread of any length — the results sit on a continuum instead of splitting into two clumps.
 
-**Output:**
+**Output — all 40 runs of this log, one square each:**
 
-<img src="figures/accuracy_vs_length_b1_half.png" alt="left: held-out accuracy per run at each length; right: stacked bar of how many runs failed, partly succeeded, or were perfect" width="100%">
+<img src="figures/run_grid_b1_half.png" alt="grid of 40 coloured squares, ten per input length, each labelled with that run's held-out accuracy" width="100%">
 
-*Each dot on the left is one run. At length 6 they sit in two clumps — 50% or 100% — so the red
-average of 55% describes no actual run. The right panel sorts the same runs into outcomes: the
-red band (complete failure) is 9 at length 6 and 0 at length 12, though it is not a clean slide
-(9 → 4 → 6 → 0, and the middle two are within noise). The green band (perfect) does not grow at
-all.*
+*Every square is one run, labelled with its accuracy on unseen positions and coloured red (50,
+chance) to green (100). Runs are sorted within each row, so the column position carries no
+meaning — the **shape of each row** does. Length 6 splits cleanly into nine reds and one green,
+with nothing in between; length 12 is a smooth gradient from 75 to 100 with no reds at all.
+That difference in shape, not the difference in average, is what makes length 12 usable as a
+baseline and length 6 not.*
 
 ---
 
@@ -211,11 +209,9 @@ for L in 8 10 12; do
   done
 done
 
-# the two figures above
+# the figure above
 ../venv/bin/python data/background/prepare.py --b=1      # restore length-6 data
-../venv/bin/python plot.py --curve --b=1 --length=6 --split=half \
-    --out_dir=log/figures --out_name=stage1_learnability_b1.png
-../venv/bin/python plot.py --split=half --b=1 --vs_length --out_dir=log/figures
+../venv/bin/python plot.py --split=half --b=1 --grid --out_dir=log/figures
 ```
 
 Raw data: every number in this log comes from `results.csv` (one row per run) and `curves.csv`

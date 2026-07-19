@@ -506,6 +506,79 @@ def plot_curve(out_dir, b_filter=None, split='', out_name='', length_filter=None
         print(f"[curve] wrote {p}  (seeds: {sorted(by_seed)})")
 
 
+# --------------------- run grid: one square per run (from results.csv) ---------------------
+def plot_run_grid(split, out_dir, b=1, out_name=''):
+    """Every run as one labelled square: rows = input length, columns = the 10 runs.
+
+    This is the whole dataset of this experiment in one picture. The scatter-plus-bar version
+    it replaces showed the same 40 numbers twice — once as positions on an axis, once as
+    counts in a stacked bar — and asked the reader to reconcile them. Here each run is a
+    single cell carrying its own accuracy, so counts are read by scanning a row and values are
+    read off the cell, with no cross-referencing.
+
+    Runs are sorted within a row rather than kept in seed order: seed 1337 at length 6 and
+    seed 1337 at length 12 are different data, so the column index means nothing, and sorting
+    makes the shape of each row legible (a clean split at length 6, a gradient at length 12)."""
+    rows = [r for r in read_csv(RESULTS_CSV) if r['split'] == split and int(r['b']) == b]
+    if not rows:
+        print(f"[grid] no {RESULTS_CSV} rows for split={split}, b={b}; skipping")
+        return
+    rows = latest_per_key(rows, ['pos_type', 'split', 'length', 'b', 'seed'])
+    by_len = defaultdict(list)
+    for r in rows:
+        by_len[int(r['length'])].append(float(r['heldout_acc']) * 100)
+    # Longest first in the list, and since row 0 is drawn at y=0 (the bottom), that puts the
+    # SHORTEST length in the top row -- so the rows read 6, 8, 10, 12 downwards, matching the
+    # order the log presents them in.
+    lengths = sorted(by_len, reverse=True)
+    ncol = max(len(v) for v in by_len.values())
+
+    fig, ax = plt.subplots(figsize=(1.02 * ncol + 3.6, 0.92 * len(lengths) + 2.5))
+    # red at chance -> green at perfect; the midpoint is meaningless here, so a plain ramp
+    cmap = plt.get_cmap('RdYlGn')
+    for row, L in enumerate(lengths):
+        vals = sorted(by_len[L])
+        for col, v in enumerate(vals):
+            shade = (v - 50) / 50                    # 50% -> 0, 100% -> 1
+            ax.add_patch(Rectangle((col, row), 0.92, 0.86, facecolor=cmap(0.08 + 0.84 * shade),
+                                   edgecolor='white', linewidth=2))
+            ax.text(col + 0.46, row + 0.43, f"{v:.0f}", ha='center', va='center',
+                    fontsize=10.5, fontweight='bold',
+                    color='white' if shade < 0.28 or shade > 0.72 else '#333333')
+        n_fail = sum(1 for v in vals if v <= 50.001)
+        n_perf = sum(1 for v in vals if v >= 99.999)
+        ax.text(ncol + 0.25, row + 0.43,
+                f"{n_fail} failed · {n_perf} perfect", va='center', fontsize=10, color='#444444')
+
+    ax.set_yticks([r + 0.43 for r in range(len(lengths))])
+    ax.set_yticklabels([f"length {L}" for L in lengths], fontsize=11)
+    ax.set_xticks([])
+    ax.set_xlim(-0.15, ncol + 3.4)
+    ax.set_ylim(-0.2, len(lengths))
+    for s in ax.spines.values():
+        s.set_visible(False)
+    ax.tick_params(length=0)
+    ax.set_title('Accuracy on positions never seen in training — one square per run',
+                 fontsize=13, fontweight='bold', pad=12)
+    # Training success is deliberately a sentence, not a per-cell number: every run reached
+    # 100% on trained positions at either iteration 100 or 200, and eval_interval is 100, so
+    # the difference is a single measurement tick. Printing it per cell would imply a
+    # resolution the data does not have.
+    ax.text(0, -0.10,
+            f'{ncol} runs per length, sorted low to high.   '
+            '50 = no better than guessing (one label for everything)   ·   100 = all correct',
+            fontsize=9.5, color='#555555', va='top')
+    ax.text(0, -0.34,
+            f'Learning was never the problem: all {ncol * len(lengths)} runs reached 100% on '
+            'the positions they were trained on, within 100–200 iterations.',
+            fontsize=9.5, color='#555555', va='top', style='italic')
+    fig.tight_layout()
+    p = os.path.join(out_dir, out_name or f'run_grid_b{b}_{split}.png')
+    fig.savefig(p, dpi=150)
+    plt.close(fig)
+    print(f"[grid] wrote {p}  (lengths={lengths}, {ncol} runs each)")
+
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--split', default='half', help="which split to plot (none|half)")
@@ -513,6 +586,8 @@ if __name__ == '__main__':
                     help="plot the headline accuracy-vs-b figure (val + held-out)")
     ap.add_argument('--vs_length', action='store_true',
                     help="plot accuracy + seed-success-rate against input length (Stage 1 gate)")
+    ap.add_argument('--grid', action='store_true',
+                    help="plot every run as one labelled square (rows = length)")
     ap.add_argument('--decay', action='store_true',
                     help="plot error rate against distance beyond the training region")
     ap.add_argument('--curve', action='store_true',
@@ -544,6 +619,9 @@ if __name__ == '__main__':
     elif args.vs_length:
         plot_vs_length(args.split, args.out_dir, b=(b_filter[0] if b_filter else 1),
                        out_name=args.out_name)
+    elif args.grid:
+        plot_run_grid(args.split, args.out_dir, b=(b_filter[0] if b_filter else 1),
+                      out_name=args.out_name)
     elif args.decay:
         plot_decay(args.split, args.out_dir,
                    length=(length_filter[0] if length_filter else 12),
