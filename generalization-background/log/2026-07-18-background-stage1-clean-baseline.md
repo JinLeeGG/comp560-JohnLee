@@ -46,18 +46,24 @@ Every other slot is a background token.
 
 > **Label: `T` if the distance from X to Y is exactly 1; `F` for any larger distance.**
 
-```
-XY0000  ->  T     distance 1
-0XY000  ->  T     distance 1
-X0Y000  ->  F     distance 2
-X00Y00  ->  F     distance 3
-```
-
 Everything in this log is at **b=1**, so the background is all `0`. The task is deliberately
 easy so that it is never the bottleneck — the background is meant to be the only difficulty.
 
-**The split:** X and Y are placed only in the **first half** of the string for training, and
-only in the **second half** for testing. The second half is never seen during training.
+**The split:** X and Y must both sit in the **first half** of the string for training, and both
+in the **second half** for testing. The second half is never seen during training.
+
+At length 6 that gives three positions per half, so these are *all* the examples that exist:
+
+```
+training (X and Y in 0–2)      held-out test (X and Y in 3–5)
+  XY0000  ->  T   distance 1     000XY0  ->  T   distance 1
+  0XY000  ->  T   distance 1     0000XY  ->  T   distance 1
+  X0Y000  ->  F   distance 2     000X0Y  ->  F   distance 2
+```
+
+Only distances 1 and 2 can occur: three positions cannot hold a pair further apart, and a pair
+straddling the halves (`X00Y00`, X at 0 and Y at 3) belongs to neither pool. Longer inputs, in
+Run 2, admit larger distances.
 
 ---
 
