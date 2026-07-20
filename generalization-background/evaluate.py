@@ -1,9 +1,9 @@
 """
 Evaluation script for the distance-1 task (from-scratch micro-transformer engine).
 
-Reads the held-out test examples (data/background/test.txt), feeds each '<LENGTH chars>:'
-prompt to the model, reads the argmax at the answer position (the token after ':'), and
-checks it against the gold T/F label.
+Reads the held-out test examples (data/background/test.txt), feeds each LENGTH-char body to
+the model (no ':' marker), reads the argmax at the last position (the predicted next token),
+and checks it against the gold T/F label.
 
     LABEL MAPPING (must match prepare.py):  T iff the X-Y distance is exactly 1; F for any
     larger distance. X is always to the left of Y.
@@ -102,6 +102,7 @@ split_detail = meta.get('split_detail', '')
 LENGTH = meta['length']
 B = meta['b']
 BACKGROUND = meta.get('background', '0123456789'[:B])
+MARKER = meta.get('marker', '')      # '' (answer is next token) or ':' (colon version)
 encode = lambda s: [stoi[c] for c in s]
 decode = lambda ids: ''.join(itos[i] for i in ids)
 
@@ -140,8 +141,9 @@ B, LENGTH = ckpt_b, ckpt_length
 
 @torch.no_grad()
 def predict_batch(bodies):
-    """Greedy argmax label for a list of length-LENGTH bodies (feeds body+':')."""
-    ids = torch.tensor([encode(b + ':') for b in bodies], dtype=torch.long, device=device)
+    """Greedy argmax label for a list of length-LENGTH bodies (feeds the body as-is; there is
+    no ':' marker, so the answer is the next token after the LENGTH-token body)."""
+    ids = torch.tensor([encode(b + MARKER) for b in bodies], dtype=torch.long, device=device)
     preds = []
     for i in range(0, len(ids), 512):
         logits = model(ids[i:i + 512])[:, -1, :]
@@ -158,8 +160,8 @@ if num_test:
 counts = {'T': [0, 0], 'F': [0, 0]}   # label -> [correct, total]  (T=distance 1, F=larger)
 nonbinary = 0
 errors = []
-bodies = [e.split(':')[0] for e in examples]
-golds = [e.split(':')[1] for e in examples]
+bodies = [e[:LENGTH] for e in examples]              # body = first LENGTH chars
+golds = [e[LENGTH + len(MARKER):] for e in examples]  # answer = what follows the MARKER
 preds = predict_batch(bodies)
 for body, gold, pred in zip(bodies, golds, preds):
     counts[gold][1] += 1

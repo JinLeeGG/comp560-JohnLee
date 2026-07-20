@@ -192,29 +192,37 @@ baseline and length 6 not.*
 
 ## Reproduce
 
+This log is the **colon** version: the input carries a trailing `:` (`--marker=:`), so the
+data generator and the CSVs are the `_colon` variants. The colon-free follow-up is in
+[2026-07-19](2026-07-19-background-nocolon-baseline.md).
+
 ```bash
+CO="--results_csv=results_colon.csv --predictions_csv=predictions_colon.csv"
+CU="--curves_csv=curves_colon.csv"
+
 # Run 1: length 6, 10 seeds
-../venv/bin/python data/background/prepare.py --b=1
+../venv/bin/python data/background/prepare.py --b=1 --marker=:
 for s in 1337 1338 1339 1340 1341 1342 1343 1344 1345 1346; do
-  ../venv/bin/python train.py    config/basic.py --seed=$s
-  ../venv/bin/python evaluate.py config/basic.py --seed=$s
+  ../venv/bin/python train.py    config/basic.py --seed=$s $CU
+  ../venv/bin/python evaluate.py config/basic.py --seed=$s $CO
 done
 
-# Run 2: lengths 8, 10, 12  (block_size must be length + 2)
+# Run 2: lengths 8, 10, 12  (with a colon the body+':' is length+1, so block_size = length+2)
 for L in 8 10 12; do
-  ../venv/bin/python data/background/prepare.py --b=1 --length=$L
+  ../venv/bin/python data/background/prepare.py --b=1 --length=$L --marker=:
   for s in 1337 1338 1339 1340 1341 1342 1343 1344 1345 1346; do
-    ../venv/bin/python train.py    config/basic.py --seed=$s --block_size=$((L+2))
-    ../venv/bin/python evaluate.py config/basic.py --seed=$s
+    ../venv/bin/python train.py    config/basic.py --seed=$s --block_size=$((L+2)) $CU
+    ../venv/bin/python evaluate.py config/basic.py --seed=$s $CO
   done
 done
 
 # the figure above
-../venv/bin/python data/background/prepare.py --b=1      # restore length-6 data
-../venv/bin/python plot.py --split=half --b=1 --grid --out_dir=log/figures
+../venv/bin/python data/background/prepare.py --b=1 --marker=:   # restore length-6 colon data
+../venv/bin/python plot.py --split=half --b=1 --grid --results_csv=results_colon.csv \
+    --out_dir=log/figures --out_name=run_grid_b1_half.png
 ```
 
-Raw data: every number in this log comes from `results.csv` (one row per run) and `curves.csv`
-(the validation curves). `predictions.csv` is also written — a per-position diagnostic sweep of
-all 40 runs — but nothing in this log draws on it yet; it is kept for the follow-up analysis.
+Raw data: every number in this log comes from `results_colon.csv` (one row per run) and
+`curves_colon.csv` (the validation curves). `predictions_colon.csv` is also written — a
+per-position diagnostic sweep of all 40 runs — but nothing in this log draws on it yet.
 Environment: python 3.9.6 · torch 2.8.0 · numpy 2.0.2 · matplotlib 3.9.4; data `SEED=1337`.

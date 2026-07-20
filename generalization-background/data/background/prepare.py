@@ -3,14 +3,21 @@ Distance-1 task data generator, with BACKGROUND DIVERSITY (b) as the swept knob.
 
 Task: a fixed-length string containing X exactly once and Y exactly once, with X ALWAYS to
 the left of Y (never Y...X). Every other slot is a background token. The model reads the
-string, sees ':', and must output a SINGLE token:
+LENGTH-token string and must output a SINGLE answer token:
 
     LABEL MAPPING (fixed -- never flip this):
         T  if  Y sits immediately after X   (distance 1)
         F  otherwise                        (something sits between them, gap > 1)
 
-    0XY000:T   <- X@1 Y@2  distance 1 -> T
-    X00Y00:F   <- X@0 Y@3  gap 3  -> a gap    -> F
+    0XY000 -> T   <- X@1 Y@2  distance 1
+    X00Y00 -> F   <- X@0 Y@3  gap 3
+
+    NOTE ON FORMAT: there is NO marker (no ':') between the body and the answer. The stored
+    example is "<LENGTH chars><T|F>", so the model input is exactly the LENGTH-char body and
+    the answer is the next token. An earlier version put a ':' before the answer, which made
+    the input LENGTH+1 tokens and let T5 use the marker as a fixed positional anchor (this
+    dropped T5 badly in the colon ablation); dropping it keeps the input at LENGTH tokens, as
+    the 7/7 note specifies.
 
 Since X is always before Y, the label is purely "is the distance 1, or larger".
 The task is deliberately EASY: it is not meant to be the bottleneck -- the background is.
@@ -89,8 +96,15 @@ import numpy as np
 
 # ----------------------------- config (overridable) -----------------------------
 SEED = 1337
-LENGTH = 6             # fixed input length (slots before ':'); 6 = the debugging anchor
+LENGTH = 6             # fixed input length (body tokens the model reads); 6 = debugging anchor
 B = 1                  # BACKGROUND DIVERSITY: number of distinct background token types (1..10)
+
+# MARKER: token(s) placed between the body and the answer. '' (default) = no marker, so the
+# input is exactly LENGTH tokens and the answer is the next token, matching the 7/7 note. Set
+# to ':' to reproduce the earlier colon version (input becomes LENGTH+1 tokens, and T5 can use
+# the colon as a positional anchor). This is the one thing that differs between the 7/18 and
+# 7/19 logs, so it is a parameter rather than hard-coded.
+MARKER = ''
 
 # Which region X and Y live in (the held-out axis is symbol POSITION, not length):
 #   'none' : no held-out positions -> full distribution (learnability baseline)
@@ -105,7 +119,7 @@ N_TEST = 2_000         # held-out test examples (class-balanced, configuration-c
 # poor-man's configurator: --key=value overrides a config key above. Lowercase aliases are
 # accepted (--b, --length, --split) since that is how the run plan spells them.
 _ALIASES = {'b': 'B', 'length': 'LENGTH', 'split': 'SPLIT', 'seed': 'SEED',
-            'n_train': 'N_TRAIN', 'n_val': 'N_VAL', 'n_test': 'N_TEST'}
+            'n_train': 'N_TRAIN', 'n_val': 'N_VAL', 'n_test': 'N_TEST', 'marker': 'MARKER'}
 for arg in sys.argv[1:]:
     assert arg.startswith('--') and '=' in arg, f"expected --key=value, got {arg!r}"
     key, val = arg[2:].split('=', 1)
@@ -154,11 +168,18 @@ def configs_for(allowed, label):
 
 
 def make_example(x, y, label):
-    """Build one '<LENGTH chars>:<T|F>' example with X at x, Y at y, background elsewhere."""
+    """Build one '<LENGTH chars><MARKER><T|F>' example with X at x, Y at y, background
+    elsewhere. MARKER is '' by default (answer is the next token) or ':' for the colon version."""
     chars = [random.choice(BACKGROUND) for _ in range(LENGTH)]
     chars[x] = 'X'
     chars[y] = 'Y'
-    return ''.join(chars) + ':' + label
+    return ''.join(chars) + MARKER + label
+
+
+def split_ex(e):
+    """Split a stored example into (body, label). The body is the first LENGTH chars; the
+    label is whatever follows the MARKER (MARKER sits between them, so skip len(MARKER))."""
+    return e[:LENGTH], e[LENGTH + len(MARKER):]
 
 
 def make_balanced_pool(n, role):
@@ -245,7 +266,7 @@ SPLIT_DETAIL = {'none': 'full', 'half': 'first->second'}[SPLIT]
 with open(os.path.join(here, 'meta.pkl'), 'wb') as f:
     pickle.dump({'vocab_size': vocab_size, 'stoi': stoi, 'itos': itos,
                  'split': SPLIT, 'split_detail': SPLIT_DETAIL,
-                 'length': LENGTH, 'b': B, 'background': BACKGROUND}, f)
+                 'length': LENGTH, 'b': B, 'background': BACKGROUND, 'marker': MARKER}, f)
 
 
 # ----------------------------- checks + report -----------------------------
@@ -268,7 +289,7 @@ def check_examples(examples):
     token set. Position determines the answer, so a placement/label/background bug has to be
     caught here, before training."""
     for e in examples:
-        body, label = e.split(':')
+        body, label = split_ex(e)                      # split by position (handles MARKER)
         assert len(body) == LENGTH, f"body length {len(body)} != {LENGTH}: {e!r}"
         x, y = xy_positions(body)
         assert x < y, f"X must be left of Y (never Y...X): X@{x} Y@{y}  {e!r}"
@@ -285,7 +306,7 @@ def check_split(examples, role):
     if SPLIT != 'half':
         return                                        # 'none' -> no positional constraint
     for e in examples:
-        x, y = xy_positions(e.split(':')[0])
+        x, y = xy_positions(e[:LENGTH])
         if role == 'train':
             assert x < HALF and y < HALF, f"train/val X,Y outside first half: {e!r}"
         else:
@@ -314,7 +335,7 @@ for name, ex, role in [('train', train_examples, 'train'),
     check_examples(ex)                                # raises on any label/placement/bg bug
     check_split(ex, role)                             # raises if the split rule is violated
     t, fa = class_balance(ex)
-    cfgs = sorted({xy_positions(e.split(':')[0]) for e in ex})
+    cfgs = sorted({xy_positions(e[:LENGTH]) for e in ex})
     n_t_cfg = sum(1 for c in cfgs if label_for(*c) == 'T')
     print(f"{name:5s}: {len(ex):>6d} examples | T(dist=1)={t} F(gap)={fa} ({t / len(ex):.1%} T)"
           f" | {len(cfgs)} configs ({n_t_cfg} T, {len(cfgs) - n_t_cfg} F)"
@@ -342,7 +363,7 @@ print(f"train.bin: {n_train_tok:,} tokens | val.bin: {n_val_tok:,} tokens | "
 
 def show(examples, k=6):
     for e in examples[:k]:
-        body, label = e.split(':')
+        body, label = split_ex(e)
         x, y = xy_positions(body)
         kind = 'dist=1  ' if y == x + 1 else 'gap     '
         print(f"  X@{x:>2} Y@{y:>2}  gap={y - x:>2} ({kind}) -> {label}   {e}")

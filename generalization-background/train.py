@@ -116,9 +116,10 @@ decode = lambda ids: ''.join(itos[i] for i in ids)
 def load_examples(name):
     """Read a flat .bin stream (written by prepare.py) back into one example per row.
 
-    Each example is "<body>:<label>"; we feed the body+':' as input and supervise the single
-    label token. The model sees positions 0..T-2 and predicts the label at the last
-    position, so the loss lands exactly on the answer token.
+    Each example is "<body><label>" with no separator (see prepare.py); we feed the body as
+    input and supervise the single label token. The model sees positions 0..T-2 (the LENGTH
+    body tokens) and predicts the label at the last position, so the loss lands exactly on the
+    answer token.
     """
     ids = np.fromfile(os.path.join(data_dir, f'{name}.bin'), dtype=np.uint16)
     lines = [ln for ln in decode(ids.tolist()).split('\n') if ln]
@@ -127,7 +128,7 @@ def load_examples(name):
     assert all(len(t) == L for t in toks), \
         "examples are not all the same length -- per-example batching needs fixed length"
     arr = torch.tensor(toks, dtype=torch.long)
-    x = arr[:, :-1]            # (N, T)   body + ':'
+    x = arr[:, :-1]            # (N, T)   the LENGTH body tokens
     y = arr[:, -1]             # (N,)     the answer (label) token
     return x, y
 
