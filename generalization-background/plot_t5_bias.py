@@ -137,8 +137,9 @@ for ax, path, (dists, bias, meta) in zip(axes, ckpt_paths, series):
     for h in range(bias.size(1)):
         ax.plot(dists, bias[:, h].tolist(), marker='o', label=f'head {h}')
     ax.axvline(1, color='0.5', ls='--', lw=1)
-    ax.annotate('adjacency (T)', xy=(1, ax.get_ylim()[1]), xytext=(1.15, 0.92),
-                textcoords='axes fraction', fontsize=8, color='0.4')
+    ax.text(1, 0.98, 'adjacent', transform=ax.get_xaxis_transform(), fontsize=8,
+            color='0.45', ha='center', va='top',
+            bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.75))
     ax.axhline(0, color='0.85', lw=0.8, zorder=0)
     if label_list:
         title = label_list[ckpt_paths.index(path)]
@@ -146,11 +147,11 @@ for ax, path, (dists, bias, meta) in zip(axes, ckpt_paths, series):
         va = f", val {meta['val_acc']:.0%}" if meta['val_acc'] is not None else ""
         title = f"seed {meta['seed']}{va}"
     ax.set_title(title, fontsize=10)
-    ax.set_xlabel('distance back to key')
+    ax.set_xlabel('distance between the two tokens')
     ax.set_xticks(dists)
 axes[0].set_ylabel('learned T5 bias')
 axes[0].legend(fontsize=8, frameon=False)
-fig.suptitle('T5 relative-distance bias per head (a spike at d=1 = the gap is read)', fontsize=11)
+fig.suptitle('learned T5 bias vs distance, per head', fontsize=11)
 fig.tight_layout(rect=(0, 0, 1, 0.96))
 
 os.makedirs(os.path.dirname(out) or '.', exist_ok=True)

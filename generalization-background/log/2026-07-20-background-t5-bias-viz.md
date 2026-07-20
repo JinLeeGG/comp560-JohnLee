@@ -26,13 +26,15 @@ that works (1337). The right panel is the seed that fails (1338).
 A bump at distance 1 is the sensible one. To check whether X is next to Y, a token looks at its
 immediate neighbour, which is distance 1. So a bump there is exactly the move the task needs.
 
-<img src="figures/t5_bias_b1_len6.png" alt="both panels show a small bump at distance 1 and a larger bump at a far distance, mostly distance 4. The two seeds look broadly similar. All values are within plus or minus 0.08" width="100%">
+<img src="figures/t5_bias_b1_len6.png" alt="both panels show a small bump at distance 1 and a larger bump at a far distance, mostly distance 4. The two panels differ in detail. All values are within plus or minus 0.08" width="100%">
 
 ### What it means
 
-The graph does not tell the working seed from the failing one. Both look about the same. Each has a
-small bump at distance 1 (a bit larger in the working seed), and each has its biggest bump at a far
-distance (distance 4 for most of the lines).
+The two panels are not identical, but where they differ (for example the sign at distance 0 and
+distance 3) is at distances the task does not use, so it does not explain why one seed generalizes
+and the other fails. What matters is what they share. Both have only a small bump at distance 1 (a
+bit larger in the working seed), and both put their biggest bump at a far distance (distance 4 for
+most of the lines).
 
 The distance-1 bump makes sense, because that is the neighbour check the task needs. The distance-4
 bump does not make sense. X and Y are never 4 apart, so a bump there has no clear task meaning, and we
