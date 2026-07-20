@@ -73,7 +73,8 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
         v = v.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
 
-        q, k = self.pe.rotate_qk(q, k)                                  # Branch B (rope)
+        # jmac: is this a bug? Employs ROPE even if pos_type is t5. The T5 branch is below, but this is always called.
+        #jmac q, k = self.pe.rotate_qk(q, k)                                  # Branch B (rope)
         att = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_dim)      # (B, n_head, T, T)
         bias = self.pe.attention_bias(T, x.device)                     # Branch C (t5)
         if bias is not None:

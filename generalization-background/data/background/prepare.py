@@ -104,7 +104,7 @@ B = 1                  # BACKGROUND DIVERSITY: number of distinct background tok
 # to ':' to reproduce the earlier colon version (input becomes LENGTH+1 tokens, and T5 can use
 # the colon as a positional anchor). This is the one thing that differs between the 7/18 and
 # 7/19 logs, so it is a parameter rather than hard-coded.
-MARKER = ''
+MARKER = ':'   # jmac
 
 # Which region X and Y live in (the held-out axis is symbol POSITION, not length):
 #   'none' : no held-out positions -> full distribution (learnability baseline)

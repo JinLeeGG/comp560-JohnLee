@@ -22,7 +22,7 @@ log_interval = 100       # the val curve is what gates Stage 1
 # one method under test and the background knob does the varying. ('rope' is worth a single
 # spot-check if a result looks T5-specific -- see the README -- but the focus stays t5.)
 pos_type = 't5'          # 'none' | 'learned' | 'sinusoidal' | 'rope' | 't5'
-causal = True            # True = decoder mask; False = bidirectional attention ablation
+causal = False #jmac            # True = decoder mask; False = bidirectional attention ablation
 t5_bias_mode = 'auto'    # 'auto' follows causal; use 'causal' for mask-only T5 ablation
 
 # --- model: deliberately SMALL (MacCormick's 6/30 note) ---
@@ -42,7 +42,7 @@ bias = True
 
 # --- optimizer / schedule (unchanged from the prior task folders) ---
 batch_size = 64
-max_iters = 2000         # a small model on an easy task converges fast; read the val curve
+max_iters = 500         # a small model on an easy task converges fast; read the val curve
 learning_rate = 1e-3     # (curves.csv / plot.py --curve) and cut this if it plateaus early
 min_lr = 1e-4
 warmup_iters = 100
