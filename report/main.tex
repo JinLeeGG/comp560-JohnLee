@@ -44,6 +44,7 @@ Fixed-Length Position Generalization in Micro-Transformers}
 
 \author{%
   John Lee \\
+  Deep Network Understanding Lab \\
   Department of Computer Science \\
   Dickinson College \\
   \texttt{leejo@dickinson.edu} \\
@@ -56,8 +57,8 @@ Fixed-Length Position Generalization in Micro-Transformers}
 % ============================================================================
 \begin{abstract}
 % [Write this LAST. ~150--200 words. Should be understandable on its own.]
-Length generalization, training on short sequences and testing on longer ones,
-has been studied extensively. But a transformer can also fail without any change
+Length generalization for transformer models, training on short sequences and
+testing on longer ones, has been studied extensively. But a transformer can also fail without any change
 in sequence length: the shift can be over \emph{where} a task-relevant symbol
 sits within a fixed length. We study this fixed-length, held-out-position setting
 on a micro-transformer (under one million parameters), trained from scratch to
@@ -68,10 +69,12 @@ positions perfectly, but only the relative encodings (no positional encoding,
 rotary, and a T5-style relative bias) generalize to the held-out positions,
 while the absolute encodings (learned and sinusoidal) do not transfer reliably.
 The relative/absolute distinction, not the individual method, predicts
-which encodings generalize. Notably, rotary encoding (reported to generalize
-poorly for length) generalizes here, landing with the relative encodings,
-suggesting that generalization over position at fixed length is a distinct
-phenomenon from length generalization.
+which encodings generalize. Most strikingly, rotary encoding generalizes well
+here even though it is reported to generalize poorly for length. In our
+fixed-length setting it behaves like the other relative encodings, but for length
+generalization it behaves like the absolute ones. This reversal is direct evidence
+that fixed-length position generalization is a distinct phenomenon from length
+generalization.
 \end{abstract}
 
 % ============================================================================
@@ -86,7 +89,7 @@ the model never saw during training. But length is not the only axis along which
 the input distribution can shift. Consider a task defined on a fixed-length
 input, where the answer depends on \emph{where} a special symbol sits. We can
 train only on examples where the symbol falls in the first half of the input,
-then test on examples where it falls in the second half, all without changing
+then test on examples where it falls in the second half, without changing
 the length. Every position is present in every example; what the model has not
 seen is the symbol placed at the held-out positions. This is a distribution shift over
 position within a fixed length, not over length.
@@ -104,9 +107,11 @@ one \texttt{Y}, the model decides which comes first. To test generalization we
 split the data by position, training with both symbols in the first half of the
 string and testing with both in the second half. All five runs use the same
 model; only the positional encoding differs. We compare three relative encodings
-and two absolute ones. The three relative ones are no positional encoding (NoPE),
-rotary (RoPE), and a T5-style relative bias (T5); the two absolute ones are a
-learned positional encoding and a sinusoidal positional encoding.
+and two absolute ones. The three relative ones are no positional encoding
+(NoPE)~\citep{kazemnejad2023impact}, rotary (RoPE)~\citep{su2021roformer}, and a
+T5-style relative bias (T5)~\citep{raffel2020t5}; the two absolute ones are a
+learned positional encoding~\citep{radford2018improving} and a sinusoidal
+positional encoding~\citep{vaswani2017attention}.
 
 Our main finding is a separation by family. All five encodings fit the trained
 positions perfectly, so the task is learnable in every case. On the held-out
@@ -165,7 +170,7 @@ and fixed-length position generalization are not the same phenomenon.
 \subsection{Task}
 Each input is a length-20 string made of the digits \texttt{0}--\texttt{9} with
 exactly one \texttt{X} and one \texttt{Y} substituted in, followed by a
-separator \texttt{:} and a single answer token. The label is \texttt{T} if the
+separator ``\texttt{:}'' and a single answer token. The label is \texttt{T} if the
 index of \texttt{X} is smaller than the index of \texttt{Y}, and \texttt{F}
 otherwise. The other eighteen characters are random digits and do not affect the
 label. Two examples:
@@ -180,10 +185,10 @@ label. Two examples:
 \noindent The model reads the string and the separator and predicts one token.
 Because the answer is a single token, chance accuracy is 50\%, and we keep the
 two classes balanced so that accuracy is meaningful. The model's input vocabulary
-is the ten digits, \texttt{X}, \texttt{Y}, and the separator \texttt{:}; the two
-labels \texttt{T} and \texttt{F} appear only as the output token.
+is the ten digits, \texttt{X}, \texttt{Y}, and the separator ``\texttt{:}''; the
+two labels \texttt{T} and \texttt{F} appear only as the output token.
 
-\subsection{The position split}
+\subsection{The position split}\label{subsec:split}
 The generalization test is created entirely by controlling \emph{where}
 \texttt{X} and \texttt{Y} are allowed to appear. This report uses the \texttt{half} split
 throughout: training and validation examples place both symbols in the first half
@@ -214,7 +219,8 @@ across runs is the positional encoding. Training uses AdamW with learning rate $
 to $10^{-4}$ with a 100-iteration warmup), batch size 64, for 2000 iterations on
 CPU. The loss is computed only on the final answer token, not on the digits, so
 the model is scored on the classification decision rather than on modeling the
-input stream.
+input stream. The code for the model, data generation, and evaluation is available
+at \url{https://github.com/JinLeeGG/comp560-JohnLee}.
 
 \subsection{The five positional encodings}
 We compare three relative and two absolute encodings, holding the rest of the
@@ -230,9 +236,10 @@ architecture fixed:
   indexed by the relative distance between query and key is added to the attention
   score, using the standard T5 bucketing (exact buckets for nearby offsets and
   log-spaced buckets for far ones; 32 buckets, causal).
-  \item \textbf{Absolute.} \emph{Learned}: a trainable position embedding is
-  added to the token embedding at each index. \emph{Sinusoidal}: the fixed
-  sine/cosine table of \citet{vaswani2017attention} is added instead.
+  \item \textbf{Absolute.} \emph{Learned}~\citep{radford2018improving}: a
+  trainable position embedding is added to the token embedding at each index.
+  \emph{Sinusoidal}: the fixed sine/cosine table of \citet{vaswani2017attention}
+  is added instead.
 \end{itemize}
 
 \subsection{Seeds and reporting}
@@ -255,7 +262,9 @@ on the held-out positions: the three relative encodings average between 95.7\% a
 99.2\%, while the two absolute encodings average 68.6\% (learned) and 31.9\%
 (sinusoidal), both well below the relative family. The relative/absolute gap
 (roughly 27 to 67 percentage points) is far larger than the standard error of any
-mean, so the separation is robust.
+mean, so the separation is robust. Sinusoidal in particular sits well below chance
+rather than merely failing to transfer, a stronger failure we take up in
+Section~\ref{subsec:twofail}.
 
 \begin{table}[t]
   \centering
@@ -278,46 +287,14 @@ mean, so the separation is robust.
   \end{tabular}
 \end{table}
 
-The per-seed breakdown (Table~\ref{tab:perseed}) shows that the family gap holds on
-every seed, but also that the encodings differ in stability. The relative
-encodings are consistently high; among them, RoPE is the least stable, dropping
-to 79.6\% on one seed while NoPE and the T5 bias never fall below 92.9\%. The two
-absolute encodings behave very differently from each other. Sinusoidal is
-consistently below chance on every seed (19.2\% to 42.7\%). Learned is highly
-variable: it ranges from 50.0\% (pure chance) up to 100\% on one seed, with two
-further seeds above 89\%. The absolute family therefore does not fail uniformly:
-one member fails robustly, the other fails only on average and occasionally
-generalizes.
-
-\begin{table}[t]
-  \centering
-  \caption{Held-out accuracy by seed on the \texttt{half} split (each seed's own
-  data split). The relative family stays high on every seed; sinusoidal is
-  consistently below chance; learned is highly variable (50\% to 100\%).}
-  \label{tab:perseed}
-  \begin{tabular}{lccccc}
-    \toprule
-    Seed & NoPE & RoPE & T5 & Learned & Sinusoidal \\
-    \midrule
-    1337 & 100.0 &  99.7 & 100.0 &  69.0 & 30.6 \\
-    1338 &  97.5 &  92.8 & 100.0 &  50.0 & 26.4 \\
-    1339 & 100.0 & 100.0 & 100.0 &  89.7 & 36.6 \\
-    1340 & 100.0 & 100.0 & 100.0 &  69.1 & 40.6 \\
-    1341 &  94.7 &  79.6 & 100.0 & 100.0 & 33.2 \\
-    1342 & 100.0 & 100.0 &  92.9 &  50.0 & 35.4 \\
-    1343 & 100.0 &  86.5 & 100.0 &  92.7 & 29.1 \\
-    1344 & 100.0 &  98.3 &  99.3 &  60.0 & 42.7 \\
-    1345 & 100.0 & 100.0 & 100.0 &  50.0 & 24.6 \\
-    1346 & 100.0 & 100.0 & 100.0 &  55.6 & 19.2 \\
-    \midrule
-    Mean & 99.2 & 95.7 & 99.2 & 68.6 & 31.9 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
 Figure~\ref{fig:heldout} plots held-out accuracy per encoding with the individual
-seeds overlaid. Because every encoding reaches 100\% validation accuracy, each gap
-below it is a failure to generalize, not a failure to learn.
+seeds overlaid, and shows that the family gap holds on every seed while the
+encodings differ in stability. Among the relative encodings RoPE is the least
+stable, dropping to 79.6\% on one seed while NoPE and the T5 bias never fall below
+92.9\%. The two absolute encodings fail differently: sinusoidal is below chance on
+every seed, whereas learned is bimodal, ranging from 50\% up to 100\%, so its mean
+is a value no single seed produced. Full per-seed numbers are in
+Appendix~\ref{app:perseed}.
 
 \begin{figure}[t]
   \centering
@@ -326,29 +303,32 @@ below it is a failure to generalize, not a failure to learn.
   mean over ten seeds; each dot is one seed (a box plot is misleading at $n=10$).
   The relative family sits near the val=100\% line; learned straddles chance with a
   wide, bimodal spread, so its mean bar (68.6\%) is a value no single seed produced;
-  sinusoidal sits below chance. RoPE's one low seed (79.6\%) is labelled. Because
+  sinusoidal sits below chance. RoPE's one low seed (79.6\%) is labeled. Because
   every encoding reaches 100\% validation accuracy, each gap below it is a
   generalization failure, not a learning failure.}
   \label{fig:heldout}
 \end{figure}
 
-Figure~\ref{fig:perpos} breaks the same accuracy down by the positions of
-\texttt{X} and \texttt{Y}. The relative encodings are correct across the whole
-grid, while the absolute encodings are correct only in the trained block
-(top-left) and break on the held-out positions (bottom-right), where learned is
-uneven and sinusoidal falls well below chance.
+Figure~\ref{fig:perpos} breaks accuracy down by the positions of \texttt{X} and
+\texttt{Y}. The relative encodings are correct across the whole grid; the absolute
+encodings are correct in the trained block (top-left) but fail in the held-out
+block (bottom-right), where learned is uneven and sinusoidal falls well below
+chance.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{per_position_multiseed.png}
-  \caption{Per-position accuracy by encoding, averaged over ten seeds. Cell =
-  accuracy with \texttt{X} at the row position and \texttt{Y} at the column
-  position; the grey diagonal ($x=y$) is excluded because the two symbols never
-  share a cell. Relative encodings are correct everywhere; the absolute encodings
-  are correct in the trained block and fail in the held-out block. Colour is a
-  colour-blind-safe diverging map (blue = correct, grey = chance, red = below
-  chance). Sinusoidal's red/blue triangular split in the held-out block reflects
-  collapse to a single label, not distance reading.}
+  \caption{Per-position accuracy for each encoding (ten-seed mean); the vertical
+  axis is \texttt{X}'s position and the horizontal is \texttt{Y}'s. The diagonal
+  ($x=y$) is excluded because the two symbols never share a cell. Blue = correct,
+  gray = chance, red = below chance. Each cell is one ordered position pair, so the
+  grid covers every pair of positions. The top-left block has both symbols in 0--9 (trained)
+  and the bottom-right both in 10--19 (held-out); the two off-diagonal blocks, with
+  one symbol in each half, are shown only for context.
+  In sinusoidal's held-out block, the split into a correct and an incorrect triangle
+  reflects the model largely predicting a single label: it gives the same answer
+  regardless of position, so it is correct only where that answer happens to be
+  right, not because it reads the positions.}
   \label{fig:perpos}
 \end{figure}
 
@@ -369,8 +349,8 @@ positions. The absolute encodings tie the computation to the specific indices
 seen in training (0--9). On the held-out indices (10--19) those features do not
 carry the meaning the model learned, so the model misfires.
 
-\subsection{Two ways for an absolute encoding to fail}
-The two absolute encodings are both absolute, but they fail in different ways, and
+\subsection{Two ways for an absolute encoding to fail}\label{subsec:twofail}
+The two absolute encodings fail in different ways, and
 the difference points to a mechanism. Sinusoidal fails robustly: it is below chance
 on every seed ($31.9 \pm 6.9$), because its position vectors are fixed by a formula
 and never adapt. The vectors for the held-out positions produce a definite signal,
@@ -445,5 +425,42 @@ experiment to report, framed the research questions, and read the cited work
 personally to verify the Related Work. The author reviewed every claim, number, and
 figure against the experiment logs, revised the draft sentence by sentence, and takes
 full responsibility for the accuracy and originality of the final report.
+
+% ============================================================================
+\appendix
+\section{Per-seed held-out accuracy}
+\label{app:perseed}
+\renewcommand{\thetable}{A\arabic{table}}
+\setcounter{table}{0}
+
+Table~\ref{tab:perseed} gives the held-out accuracy of every encoding on each of
+the ten seeds, the per-seed data behind Figure~\ref{fig:heldout} and the means in
+Table~\ref{tab:main}.
+
+\begin{table}[h]
+  \centering
+  \caption{Held-out accuracy by seed on the \texttt{half} split (each seed's own
+  data split). The relative family stays high on every seed; sinusoidal is
+  consistently below chance; learned is highly variable (50\% to 100\%).}
+  \label{tab:perseed}
+  \begin{tabular}{lccccc}
+    \toprule
+    Seed & NoPE & RoPE & T5 & Learned & Sinusoidal \\
+    \midrule
+    1337 & 100.0 &  99.7 & 100.0 &  69.0 & 30.6 \\
+    1338 &  97.5 &  92.8 & 100.0 &  50.0 & 26.4 \\
+    1339 & 100.0 & 100.0 & 100.0 &  89.7 & 36.6 \\
+    1340 & 100.0 & 100.0 & 100.0 &  69.1 & 40.6 \\
+    1341 &  94.7 &  79.6 & 100.0 & 100.0 & 33.2 \\
+    1342 & 100.0 & 100.0 &  92.9 &  50.0 & 35.4 \\
+    1343 & 100.0 &  86.5 & 100.0 &  92.7 & 29.1 \\
+    1344 & 100.0 &  98.3 &  99.3 &  60.0 & 42.7 \\
+    1345 & 100.0 & 100.0 & 100.0 &  50.0 & 24.6 \\
+    1346 & 100.0 & 100.0 & 100.0 &  55.6 & 19.2 \\
+    \midrule
+    Mean & 99.2 & 95.7 & 99.2 & 68.6 & 31.9 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \end{document}
