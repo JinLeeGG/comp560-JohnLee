@@ -20,3 +20,7 @@ test.txt
 # editor / OS / tooling cruft
 .DS_Store
 .claude/
+# Local document/PDF rendering intermediates.
+/tmp/
+# Microsoft Office lock files.
+~$*.pptx

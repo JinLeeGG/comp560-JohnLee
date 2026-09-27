@@ -1,0 +1,6 @@
+timestamp,pos_type,split,split_detail,seed,val_acc,heldout_acc,heldout_T_acc,heldout_F_acc
+2026-09-27T19:31:03,none,half,first->second,1337,1.000000,0.500000,0.000000,1.000000
+2026-09-27T19:32:51,none,half,first->second,1338,1.000000,0.500000,0.000000,1.000000
+2026-09-27T19:34:52,none,half,first->second,1339,1.000000,0.500000,0.000000,1.000000
+2026-09-27T19:36:58,none,half,first->second,1340,1.000000,0.500000,0.000000,1.000000
+2026-09-27T19:39:30,none,half,first->second,1341,1.000000,0.549000,0.098000,1.000000

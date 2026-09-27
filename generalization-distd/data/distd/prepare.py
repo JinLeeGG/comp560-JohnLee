@@ -68,9 +68,21 @@ import random
 import numpy as np
 
 # ----------------------------- config -----------------------------
-SEED = 1337
+SEED = int(os.environ.get('DATA_SEED', '1337'))
 LENGTH = 20            # fixed input length (number of char slots before ':')
 D = 5                  # THRESHOLD: T iff distance >= D, else F. The one constant of this task.
+
+# The historical experiment sampled a uniformly random position pair conditional on the
+# class for train/val, while its held-out test balanced distances within each class.  That
+# introduces a small distance-frequency shift in addition to the intended position shift.
+# Keep the historical behavior as the default so old results remain reproducible, but allow
+# a clean validation dataset in which every pool uses the test set's distance-balanced rule.
+TRAIN_DISTANCE_SAMPLING = os.environ.get('TRAIN_DISTANCE_SAMPLING', 'pair')
+assert TRAIN_DISTANCE_SAMPLING in ('pair', 'balanced')
+
+# By default write beside this script.  A separate directory lets a validation run avoid
+# overwriting the historical train.bin / val.bin / test.txt / meta.pkl files.
+OUTPUT_DIR = os.environ.get('OUTPUT_DIR', os.path.dirname(__file__))
 
 # Which region the two X's live in (the held-out axis is symbol POSITION, not length):
 #   'none' : no held-out positions -> full distribution (baseline)
@@ -167,16 +179,17 @@ def _split_count(total, distances):
     return {d: base + (1 if i < rem else 0) for i, d in enumerate(distances)}
 
 
-def make_distance_balanced_test(n):
-    """Held-out test pool with both X's in the second half (SPLIT='half'), balanced across
-    distances within each class and EXACTLY 50/50 T/F (class balance prioritized over global
-    equal-count-per-distance balance when they conflict).
+def make_distance_balanced_pool(n, role):
+    """Pool balanced across distances within each class and EXACTLY 50/50 T/F.
+
+    `role` selects the allowed position region. Class balance is prioritized over global
+    equal-count-per-distance balance when they conflict.
 
     A contiguous region of size R has distances 1..R-1. Distances < D -> F (near), distances
     >= D -> T (far). Each class gets exactly n//2 examples, spread as evenly as possible over
     its distances. With R=10, D=5, n=2000: F-distances {1,2,3,4} -> 250 each (F=1000);
     T-distances {5,6,7,8,9} -> 200 each (T=1000)."""
-    allowed = allowed_positions('test')
+    allowed = allowed_positions(role)
     R = len(allowed)
     dists = list(range(1, R))                          # 1..R-1
     near = [d for d in dists if d < D]                 # -> F
@@ -196,13 +209,21 @@ def make_distance_balanced_test(n):
     return examples, per_distance
 
 
-train_examples = make_balanced_pool(N_TRAIN, 'train')
-val_examples = make_balanced_pool(N_VAL, 'train')     # in-distribution monitoring (same rule as train)
-if SPLIT == 'half':
-    test_examples, test_per_distance = make_distance_balanced_test(N_TEST)
-else:                                                 # SPLIT == 'none': full-dist, class-balanced
-    test_examples = make_balanced_pool(N_TEST, 'test')
-    test_per_distance = None
+if TRAIN_DISTANCE_SAMPLING == 'balanced':
+    # Clean positional-shift validation: train/val/test have the same distance frequencies;
+    # only the absolute region containing the two X's changes.
+    train_examples, _ = make_distance_balanced_pool(N_TRAIN, 'train')
+    val_examples, _ = make_distance_balanced_pool(N_VAL, 'train')
+    test_examples, test_per_distance = make_distance_balanced_pool(N_TEST, 'test')
+else:
+    # Historical behavior retained for reproducibility of the committed June results.
+    train_examples = make_balanced_pool(N_TRAIN, 'train')
+    val_examples = make_balanced_pool(N_VAL, 'train')
+    if SPLIT == 'half':
+        test_examples, test_per_distance = make_distance_balanced_pool(N_TEST, 'test')
+    else:                                             # SPLIT == 'none': full-dist, class-balanced
+        test_examples = make_balanced_pool(N_TEST, 'test')
+        test_per_distance = None
 
 
 def write_bin(examples, path):
@@ -213,7 +234,8 @@ def write_bin(examples, path):
     return len(ids)
 
 
-here = os.path.dirname(__file__)
+here = OUTPUT_DIR
+os.makedirs(here, exist_ok=True)
 n_train_tok = write_bin(train_examples, os.path.join(here, 'train.bin'))
 n_val_tok = write_bin(val_examples, os.path.join(here, 'val.bin'))
 
@@ -227,7 +249,9 @@ SPLIT_DETAIL = {'none': 'full', 'half': 'first->second'}[SPLIT]
 
 with open(os.path.join(here, 'meta.pkl'), 'wb') as f:
     pickle.dump({'vocab_size': vocab_size, 'stoi': stoi, 'itos': itos,
-                 'split': SPLIT, 'split_detail': SPLIT_DETAIL, 'threshold': D}, f)
+                 'split': SPLIT, 'split_detail': SPLIT_DETAIL, 'threshold': D,
+                 'train_distance_sampling': TRAIN_DISTANCE_SAMPLING,
+                 'data_seed': SEED}, f)
 
 
 # ----------------------------- checks + report -----------------------------
@@ -276,6 +300,8 @@ def rule_str(role):
 
 print("=== dist>=D threshold data prepared ===")
 print(f"SPLIT={SPLIT}  LENGTH={LENGTH}  D={D}  SEED={SEED}")
+print(f"train distance sampling: {TRAIN_DISTANCE_SAMPLING}")
+print(f"output directory: {here}")
 vocab_display = [repr(c) for c in vocab_chars]
 print(f"vocab_size={vocab_size}  chars={vocab_display}")
 print(f"label rule    : T iff |pos2-pos1| >= {D} (far), else F (near)")
