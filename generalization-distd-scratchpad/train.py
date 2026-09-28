@@ -1,4 +1,5 @@
 """Train one scratchpad condition on the fixed-length dist>=5 task."""
+import csv
 import math
 import os
 import sys
@@ -20,6 +21,8 @@ data_dir = 'data/distd_scratchpad'
 condition = 'meaningful'
 eval_interval = 250
 log_interval = 100
+checkpoint_iters = (500, 1000, 1500, 2000)
+history_filename = 'history.csv'
 
 n_layer = 4
 n_head = 4
@@ -70,6 +73,15 @@ for arg in sys.argv[1:]:
 
 if condition not in CONDITIONS:
     raise ValueError(f"condition must be one of {CONDITIONS}, got {condition!r}")
+checkpoint_iters = tuple(sorted(set(checkpoint_iters)))
+invalid_checkpoints = [
+    iteration for iteration in checkpoint_iters
+    if iteration <= 0 or iteration > max_iters
+]
+if invalid_checkpoints:
+    raise ValueError(
+        f"checkpoint iterations must be in 1..{max_iters}: {invalid_checkpoints}"
+    )
 
 torch.manual_seed(seed)
 np.random.seed(seed)
@@ -189,17 +201,71 @@ def format_optional(value, kind='float'):
     return f"{value:.2%}" if kind == 'percent' else f"{value:.4f}"
 
 
+def checkpoint_state(iteration, val_metrics):
+    return {
+        'model': model.state_dict(),
+        'model_args': model_args,
+        'condition': condition,
+        'seed': seed,
+        'iteration': iteration,
+        'val_metrics': val_metrics,
+        'data_meta': {
+            'threshold': meta['threshold'],
+            'length': meta['length'],
+            'data_seed': meta['data_seed'],
+            'vocab_size': meta['vocab_size'],
+        },
+    }
+
+
+def write_history(rows):
+    path = os.path.join(out_dir, history_filename)
+    fieldnames = [
+        'condition', 'seed', 'data_seed', 'iteration', 'learning_rate',
+        'elapsed_seconds', 'val_answer_loss', 'val_answer_acc',
+        'val_state_loss', 'val_state_acc',
+    ]
+    with open(path, 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 start_time = time.time()
 print(f"\ntraining condition={condition} for {max_iters} iterations on {device}\n")
 final_val_metrics = None
+history_rows = []
 
 for iteration in range(max_iters + 1):
     lr = get_lr(iteration)
     for group in optimizer.param_groups:
         group['lr'] = lr
 
-    if iteration % eval_interval == 0 or iteration == max_iters:
+    if (
+        iteration % eval_interval == 0
+        or iteration in checkpoint_iters
+        or iteration == max_iters
+    ):
         final_val_metrics = evaluate_teacher_forced(val_split)
+        history_rows.append({
+            'condition': condition,
+            'seed': seed,
+            'data_seed': meta['data_seed'],
+            'iteration': iteration,
+            'learning_rate': f'{lr:.10g}',
+            'elapsed_seconds': f'{time.time() - start_time:.3f}',
+            'val_answer_loss': f"{final_val_metrics['answer_loss']:.10g}",
+            'val_answer_acc': f"{final_val_metrics['answer_acc']:.10g}",
+            'val_state_loss': (
+                '' if final_val_metrics['state_loss'] is None
+                else f"{final_val_metrics['state_loss']:.10g}"
+            ),
+            'val_state_acc': (
+                '' if final_val_metrics['state_acc'] is None
+                else f"{final_val_metrics['state_acc']:.10g}"
+            ),
+        })
+        write_history(history_rows)
         print(
             f"iter {iteration:>5}: val answer loss {final_val_metrics['answer_loss']:.4f} "
             f"acc {final_val_metrics['answer_acc']:.2%} | state loss "
@@ -207,23 +273,15 @@ for iteration in range(max_iters + 1):
             f"{format_optional(final_val_metrics['state_acc'], 'percent')}"
         )
 
+    if iteration in checkpoint_iters:
+        checkpoint_path = os.path.join(out_dir, f'ckpt_iter{iteration:04d}.pt')
+        torch.save(checkpoint_state(iteration, final_val_metrics), checkpoint_path)
+        print(f"saved checkpoint -> {checkpoint_path}")
+
     if iteration == max_iters:
+        final_checkpoint_path = os.path.join(out_dir, 'ckpt.pt')
         torch.save(
-            {
-                'model': model.state_dict(),
-                'model_args': model_args,
-                'condition': condition,
-                'seed': seed,
-                'iteration': iteration,
-                'val_metrics': final_val_metrics,
-                'data_meta': {
-                    'threshold': meta['threshold'],
-                    'length': meta['length'],
-                    'data_seed': meta['data_seed'],
-                    'vocab_size': meta['vocab_size'],
-                },
-            },
-            os.path.join(out_dir, 'ckpt.pt'),
+            checkpoint_state(iteration, final_val_metrics), final_checkpoint_path
         )
         break
 

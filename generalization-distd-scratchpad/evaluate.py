@@ -20,6 +20,7 @@ from scratchpad import (
 
 # ---------------------------- config (overridable) ----------------------------
 out_dir = 'out'
+checkpoint_name = 'ckpt.pt'
 data_dir = 'data/distd_scratchpad'
 device = 'cpu'
 seed = 1337
@@ -29,6 +30,7 @@ num_test = 0                # 0 = all
 results_csv = 'results.csv'
 predictions_csv = 'predictions.csv'
 log_results = True
+log_predictions = True
 # ------------------------------------------------------------------------------
 
 
@@ -53,10 +55,11 @@ meta = load_meta(data_dir)
 stoi, itos = meta['stoi'], meta['itos']
 
 checkpoint = torch.load(
-    os.path.join(out_dir, 'ckpt.pt'), map_location=device, weights_only=False
+    os.path.join(out_dir, checkpoint_name), map_location=device, weights_only=False
 )
 condition = checkpoint['condition']
 train_seed = checkpoint['seed']
+checkpoint_iteration = checkpoint['iteration']
 model = MicroTransformer(MicroTransformerConfig(**checkpoint['model_args']))
 model.load_state_dict(checkpoint['model'])
 model.to(device)
@@ -282,7 +285,8 @@ test_metrics, test_rows = evaluate_split('test', test_examples)
 
 print("=== Scratchpad Distance Evaluation ===")
 print(
-    f"condition={condition} | seed={train_seed} | pos_type="
+    f"condition={condition} | seed={train_seed} | iteration={checkpoint_iteration} "
+    f"| pos_type="
     f"{checkpoint['model_args']['pos_type']} | data_seed={meta['data_seed']}"
 )
 print_split('in-distribution validation', val_metrics, len(val_examples))
@@ -311,28 +315,33 @@ if log_results:
 
     append_csv(
         results_csv,
-        ['timestamp', 'condition', 'seed', 'data_seed']
+        ['timestamp', 'condition', 'seed', 'data_seed', 'iteration']
         + [f'val_{name}' for name in metric_names]
         + [f'heldout_{name}' for name in metric_names],
         [[
             datetime.now().isoformat(timespec='seconds'), condition, train_seed,
-            meta['data_seed'],
+            meta['data_seed'], checkpoint_iteration,
             *[csv_value(val_metrics[name]) for name in metric_names],
             *[csv_value(test_metrics[name]) for name in metric_names],
         ]],
     )
 
-    prediction_header = [
-        'condition', 'seed', 'data_seed', 'split', 'body', 'distance', 'gold',
-        'answer_pred', 'answer_correct', 'decision_pred', 'trace_exact',
-    ]
-    prediction_rows = []
-    for split_name, rows in (('val', val_rows), ('test', test_rows)):
-        for row in rows:
-            prediction_rows.append([
-                condition, train_seed, meta['data_seed'], split_name, row['body'],
-                row['distance'], row['gold'], row['answer_pred'],
-                row['answer_correct'], row['decision_pred'], row['trace_exact'],
-            ])
-    append_csv(predictions_csv, prediction_header, prediction_rows)
-    print(f"\nlogged -> {results_csv} and {predictions_csv}")
+    if log_predictions:
+        prediction_header = [
+            'condition', 'seed', 'data_seed', 'iteration', 'split', 'body',
+            'distance', 'gold', 'answer_pred', 'answer_correct',
+            'decision_pred', 'trace_exact',
+        ]
+        prediction_rows = []
+        for split_name, rows in (('val', val_rows), ('test', test_rows)):
+            for row in rows:
+                prediction_rows.append([
+                    condition, train_seed, meta['data_seed'], checkpoint_iteration,
+                    split_name, row['body'], row['distance'], row['gold'],
+                    row['answer_pred'], row['answer_correct'],
+                    row['decision_pred'], row['trace_exact'],
+                ])
+        append_csv(predictions_csv, prediction_header, prediction_rows)
+        print(f"\nlogged -> {results_csv} and {predictions_csv}")
+    else:
+        print(f"\nlogged -> {results_csv}")

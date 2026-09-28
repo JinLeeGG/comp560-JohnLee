@@ -6,6 +6,8 @@ condition = 'meaningful'  # 'no_scratchpad' | 'dummy' | 'meaningful'
 
 eval_interval = 250
 log_interval = 100
+checkpoint_iters = (500, 1000, 1500, 2000)
+history_filename = 'history.csv'
 
 # Model: fixed across all conditions.
 pos_type = 'none'
