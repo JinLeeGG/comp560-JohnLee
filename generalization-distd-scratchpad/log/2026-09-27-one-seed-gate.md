@@ -40,7 +40,13 @@ The same raw dataset and union vocabulary were used for all three conditions.
 
 ## Results
 
-| Condition | ID answer | Held-out answer | Held-out `T` | Held-out `F` | Held-out state | Trace exact |
+![Preliminary scratchpad generalization result](../figures/preliminary-scratchpad-result.png)
+
+*Figure 1. All three conditions solve examples using positions seen during training,
+but only the meaningful scratchpad transfers to unseen positions. The class breakdown
+shows that both controls obtain 50% by predicting `F` on every unseen-position example.*
+
+| Condition | Seen-position answer | Unseen-position answer | Unseen `T` | Unseen `F` | Unseen state | Trace exact |
 |---|---:|---:|---:|---:|---:|---:|
 | No scratchpad | 100% | 50% | 0% | 100% | n/a | n/a |
 | Dummy scratchpad | 100% | 50% | 0% | 100% | 100% | 100% |
@@ -48,12 +54,12 @@ The same raw dataset and union vocabulary were used for all three conditions.
 
 Teacher-forced and free-running final-answer accuracies were identical in all six
 condition/split combinations. The meaningful condition's decision state at the
-second `X` was also 100% correct for both `t` and `f` on the held-out set. Neither
+second `X` was also 100% correct for both `t` and `f` on the unseen-position test set. Neither
 scratchpad condition generated an invalid state token.
 
 Teacher-forced losses from the final checkpoints:
 
-| Condition | ID answer loss | ID state loss | Held-out answer loss | Held-out state loss |
+| Condition | Seen answer loss | Seen state loss | Unseen answer loss | Unseen state loss |
 |---|---:|---:|---:|---:|
 | No scratchpad | 0.001049 | n/a | 4.375575 | n/a |
 | Dummy scratchpad | 0.001248 | 0.000551 | 3.279934 | 0.000536 |
@@ -81,3 +87,4 @@ to separate counting-state supervision from repeated answer supervision.
 - All 9 state-machine, record-construction, loss-mask, and context tests passed.
 - Two-iteration end-to-end smoke training and evaluation passed for all conditions.
 - Full-data chained evaluation completed for all three 500-iteration checkpoints.
+- Figure 1 is generated from `results_gate.csv` by `plot_preliminary.py`.
