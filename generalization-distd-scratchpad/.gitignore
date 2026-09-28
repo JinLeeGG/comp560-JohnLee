@@ -1,0 +1,3 @@
+# Large per-example diagnostics are fully regenerable.
+predictions.csv
+predictions_*.csv

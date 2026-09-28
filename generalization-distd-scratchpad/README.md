@@ -1,6 +1,6 @@
 # Experiment Plan: Scratchpad Tokens for Distance-Threshold Generalization
 
-**Status:** Planning complete; implementation not started
+**Status:** Implemented and smoke-tested; one-seed gate passed; formal five-seed sweep pending
 
 **Date:** September 27, 2026
 
@@ -242,6 +242,29 @@ Formal pilot size:
 3 conditions x 5 model seeds = 15 training runs
 ```
 
+## Preliminary implementation gate
+
+The end-to-end pipeline was checked with model seed `1337` using 500 training
+iterations per condition. This shortened run used the same architecture and data as
+the formal plan, with `lr_decay_iters=500` to match the smaller optimization budget.
+
+| Condition | ID answer | Held-out answer | Held-out `T` | Held-out `F` | Held-out state / trace |
+|---|---:|---:|---:|---:|---:|
+| No scratchpad | 100% | 50% | 0% | 100% | n/a |
+| Dummy scratchpad | 100% | 50% | 0% | 100% | 100% / 100% |
+| Meaningful scratchpad | 100% | 100% | 100% | 100% | 100% / 100% |
+
+The meaningful condition also achieved 100% decision-state accuracy at the second
+`X` on the held-out test, and all scratchpad predictions were valid state tokens.
+The dummy result shows that sequence length and extra autoregressive calls alone did
+not fix the baseline failure in this seed.
+
+This is an implementation gate, not the experiment's conclusion. It establishes
+that the state machine, masked losses, and free-running evaluator can produce the
+intended contrast. The preregistered five paired seeds at 2,000 iterations are still
+required before interpreting the effect as robust. See
+[`log/2026-09-27-one-seed-gate.md`](log/2026-09-27-one-seed-gate.md) for the run record.
+
 ## Interpretation
 
 | Result | Interpretation |
@@ -264,16 +287,18 @@ supervision. If the pilot is positive, the next ablation should replace the repe
 post-decision `t/f` states with a neutral `g` state while retaining a single final
 `T/F` target.
 
-## Proposed implementation layout
+## Implementation layout
 
 ```text
 generalization-distd-scratchpad/
 ├── README.md
-├── model.py
-├── pos_encoding.py
+├── engine.py              # imports the verified distance-task model
+├── scratchpad.py          # finite-state algorithm and target masks
+├── dataset.py             # raw-data loading and condition-specific tensorization
 ├── train.py
 ├── evaluate.py
 ├── test_scratchpad.py       # state transitions, loss masks, and chained contexts
+├── run_multiseed.sh         # formal 3-condition x 5-seed sweep
 ├── config/
 │   └── basic.py
 ├── data/
@@ -283,6 +308,8 @@ generalization-distd-scratchpad/
 └── out/
 ```
 
-The model and NoPE implementation should be copied unchanged from
-`generalization-distd`; only the data representation, masked objectives, and chained
-evaluator are task-specific.
+`engine.py` reuses the verified model and NoPE implementation from
+`generalization-distd` without modifying it. The raw dataset is generated once and
+then tensorized into each condition, ensuring that all comparisons use exactly the
+same underlying examples. Only the sequence representation, masked objectives, and
+chained evaluator are specific to this experiment.
