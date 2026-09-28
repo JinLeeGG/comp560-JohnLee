@@ -1,19 +1,21 @@
 # Experiment Plan: Scratchpad Tokens for Distance-Threshold Generalization
 
 **Status:** Planning complete; implementation not started
+
 **Date:** September 27, 2026
 
 ## Research question
 
-Does explicit supervision of intermediate counting states help a NoPE
-micro-transformer generalize a learned distance rule to symbol positions that were
-not present during training?
+Do structured scratchpad tokens help a NoPE micro-transformer generalize a distance-threshold rule to symbol positions not seen during training?
 
 The experiment isolates the scratchpad intervention:
 
 - Explicit positional encoding is fixed to **NoPE** in every condition.
-- Model architecture, data, optimizer, training budget, and seeds are fixed.
-- Only the scratchpad representation changes.
+- The model, optimizer settings, and seeds are fixed across conditions.
+- All three conditions use the exact same underlying raw examples, in the same
+  train, validation, and held-out splits.
+- The dummy and meaningful scratchpad conditions are matched for sequence length
+  and inference steps; the no-scratchpad condition serves as the practical baseline.
 
 NoPE means that no position embedding, rotation, or attention bias is added. The
 causal attention mask still provides an ordering signal, so this should be described
@@ -26,23 +28,29 @@ as **no explicit positional encoding**, not as a model with no positional inform
 
 ## Verified baseline
 
-The pilot uses the existing `dist>=5` task. Before selecting it, the dataset was
-cleaned so that train, validation, and test have identical class and distance
-distributions.
+The pilot uses the existing [`dist >= 5` distance-threshold task](../generalization-distd/README.md). Before
+selecting it, the dataset was cleaned so that train, validation, and test have
+identical class and distance distributions.
 
 NoPE baseline results over five model seeds:
 
-| Metric | Mean +/- sample SD |
+| Evaluation group | Mean +/- sample SD |
 |---|---:|
-| In-distribution validation accuracy | 100.00 +/- 0.00% |
-| Held-out-position accuracy | 50.98 +/- 2.19% |
-| Held-out far (`T`) accuracy | 1.96 +/- 4.38% |
-| Held-out near (`F`) accuracy | 100.00 +/- 0.00% |
+| In-distribution validation: all examples | 100.00 +/- 0.00% |
+| Held-out test: all examples | 50.98 +/- 2.19% |
+| Held-out test: examples whose correct answer is `T` (far) | 1.96 +/- 4.38% |
+| Held-out test: examples whose correct answer is `F` (near) | 100.00 +/- 0.00% |
 
-All five models learned the task in-distribution, but all generalized poorly to the
-held-out half and nearly collapsed to predicting `F`. This provides the required
-headroom for a scratchpad intervention. It does not prove that NoPE is theoretically
-incapable of solving the task.
+The overall held-out accuracy of approximately 51% does not mean that the models
+partially distinguished far from near examples. Four seeds scored 0% on the far
+class, and one scored 9.8%, while all five seeds scored 100% on the near class.
+Therefore, the models predicted `F` for almost every held-out example.
+
+All five models reached 100% validation accuracy on positions seen during training,
+but failed to transfer the distance rule to the held-out positions. This consistent
+failure leaves clear room to test whether meaningful scratchpad states improve
+generalization. However, it does not show that every possible NoPE model is
+theoretically incapable of solving the task.
 
 Full baseline record:
 [../generalization-distd/log/2026-09-27-nope-balanced-baseline.md](../generalization-distd/log/2026-09-27-nope-balanced-baseline.md).
@@ -141,7 +149,7 @@ The model generates the correct counting states.
 2iXa1b2c3d4eXt7t:tT
 ```
 
-The primary causal comparison is meaningful versus dummy scratchpad. No scratchpad
+The primary controlled comparison is meaningful versus dummy scratchpad. No scratchpad
 shows the total practical improvement, but it is not matched for sequence length or
 inference computation.
 
@@ -209,6 +217,8 @@ Report on both in-distribution validation and held-out test:
 - Per-class `T/F` accuracy.
 - Teacher-forced final-answer accuracy.
 - State-token accuracy.
+- Decision-state accuracy at the second `X`, reported overall and separately for
+  far (`t`) and near (`f`) examples.
 - Full state-trace exact-match accuracy.
 - Invalid state-token rate.
 - `state_loss` and `answer_loss` on in-distribution validation.
@@ -263,6 +273,7 @@ generalization-distd-scratchpad/
 ├── pos_encoding.py
 ├── train.py
 ├── evaluate.py
+├── test_scratchpad.py       # state transitions, loss masks, and chained contexts
 ├── config/
 │   └── basic.py
 ├── data/
