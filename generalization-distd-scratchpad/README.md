@@ -1,8 +1,8 @@
 # Experiment Plan: Scratchpad Tokens for Distance-Threshold Generalization
 
-**Status:** Implemented and smoke-tested; one-seed gate passed; formal five-seed sweep pending
+**Status:** Formal five-seed pilot complete; neutral-tail ablation is next
 
-**Date:** September 27, 2026
+**Date:** September 28, 2026
 
 ## Research question
 
@@ -259,13 +259,82 @@ The meaningful condition also achieved 100% decision-state accuracy at the secon
 The dummy result shows that sequence length and extra autoregressive calls alone did
 not fix the baseline failure in this seed.
 
-This is an implementation gate, not the experiment's conclusion. It establishes
-that the state machine, masked losses, and free-running evaluator can produce the
-intended contrast. The preregistered five paired seeds at 2,000 iterations are still
-required before interpreting the effect as robust. See
+This was an implementation gate, not the experiment's conclusion. It established
+that the state machine, masked losses, and free-running evaluator could produce the
+intended contrast. The preregistered five paired seeds at 2,000 iterations are
+reported below. See
 [`log/2026-09-27-one-seed-gate.md`](log/2026-09-27-one-seed-gate.md) for the run record.
 
-## Interpretation
+## Formal five-seed result
+
+The formal pilot trained all three conditions with paired model seeds `1337--1341`
+and one fixed raw dataset (data seed `1337`). Each run used 2,000 optimization
+iterations. Checkpoints at 500, 1,000, 1,500, and 2,000 iterations were evaluated on
+all 5,000 seen-position validation examples and all 2,000 unseen-position examples.
+
+![Formal scratchpad generalization result](figures/formal-multiseed-result.png)
+
+*Figure 1. Dots are individual model seeds. Meaningful states reached 100% unseen-
+position answer and trace accuracy in every seed from the first 500-iteration
+checkpoint onward. The dummy condition often emitted `z` instead of a valid `T/F`
+answer on unseen positions.*
+
+Final checkpoint results, reported as mean +/- sample standard deviation across five
+model seeds:
+
+| Condition | Seen answer | Unseen answer | Unseen `T` | Unseen `F` | Invalid unseen answer | Unseen trace exact |
+|---|---:|---:|---:|---:|---:|---:|
+| No scratchpad | 100.00 +/- 0.00% | 67.39 +/- 16.11% | 34.78% | 100.00% | 0.00 +/- 0.00% | n/a |
+| Dummy tokens | 100.00 +/- 0.00% | 20.71 +/- 24.76% | 24.00% | 17.42% | 61.47 +/- 49.36% | 100.00% |
+| Meaningful states | 100.00 +/- 0.00% | 100.00 +/- 0.00% | 100.00% | 100.00% | 0.00 +/- 0.00% | 100.00% |
+
+Individual unseen-position answer accuracies at 2,000 iterations:
+
+| Condition | Seed 1337 | Seed 1338 | Seed 1339 | Seed 1340 | Seed 1341 |
+|---|---:|---:|---:|---:|---:|
+| No scratchpad | 50.00% | 50.00% | 79.00% | 82.85% | 75.10% |
+| Dummy tokens | 44.55% | 1.50% | 50.85% | 2.35% | 4.30% |
+| Meaningful states | 100.00% | 100.00% | 100.00% | 100.00% | 100.00% |
+
+Mean unseen-position answer accuracy across checkpoints:
+
+| Condition | 500 | 1,000 | 1,500 | 2,000 |
+|---|---:|---:|---:|---:|
+| No scratchpad | 61.33 +/- 17.25% | 69.27 +/- 18.00% | 67.57 +/- 16.25% | 67.39 +/- 16.11% |
+| Dummy tokens | 55.90 +/- 18.33% | 16.24 +/- 20.75% | 23.11 +/- 28.21% | 20.71 +/- 24.76% |
+| Meaningful states | 100.00 +/- 0.00% | 100.00 +/- 0.00% | 100.00 +/- 0.00% | 100.00 +/- 0.00% |
+
+The meaningful state machine is the only condition that generalized perfectly and
+consistently. Its decision state at the second `X`, every generated state, the full
+state trace, and the final answer were all 100% correct on unseen positions for all
+five seeds and all four checkpoints. The effect was therefore present by 500
+iterations; 2,000 iterations were used as the common fixed budget, not because the
+meaningful condition required that many iterations.
+
+The controls were seed-sensitive. No-scratchpad models always classified the near
+class correctly but transferred the far class in only some initializations. Dummy
+models always generated the trivial `z` state trace correctly, but three of five
+final models output `z` instead of `T` or `F` on more than 95% of unseen examples.
+Thus, the dummy mean below chance is largely an invalid-output failure, not evidence
+of systematically reversed distance reasoning.
+
+The formal no-scratchpad result is not directly interchangeable with the earlier
+task-selection baseline. This experiment retrained it with the larger union
+vocabulary used to equalize parameter counts across all scratchpad conditions; that
+changes the embedding/output layers and seeded initialization. Both experiments
+nevertheless agree that NoPE performance is initialization-sensitive and not
+reliably perfect on the held-out positions.
+
+Machine-readable outputs:
+
+- [`results_multiseed.csv`](results_multiseed.csv): all 60 checkpoint evaluations.
+- [`results_multiseed_summary.csv`](results_multiseed_summary.csv): condition-level
+  means and sample standard deviations.
+- [`plot_multiseed.py`](plot_multiseed.py): validation, summary, and figure script.
+- [`log/2026-09-28-formal-multiseed.md`](log/2026-09-28-formal-multiseed.md): full
+  run record and interpretation.
+
+## Pre-registered interpretation rules
 
 | Result | Interpretation |
 |---|---|
@@ -275,17 +344,21 @@ required before interpreting the effect as robust. See
 | All conditions near chance in-distribution | Implementation or optimization failed; do not interpret OOD results |
 | All conditions high on held-out positions | The intervention is not distinguishable in this setup |
 
-A promising pilot result requires the meaningful condition to outperform both controls
-across paired seeds while all conditions solve the in-distribution task.
+The observed result matches the first pattern within this implementation: the
+meaningful condition outperformed both controls across paired seeds while every
+condition solved the seen-position task at the final checkpoint. The limitation
+below still prevents treating this as a complete isolation of intermediate
+computation.
 
 ## Known limitation and follow-up ablation
 
 After the second `X`, meaningful scratchpads repeat the answer-bearing `t/f` state.
-Therefore a positive pilot demonstrates a benefit from meaningful process supervision,
-but does not by itself separate counting-state supervision from repeated answer
-supervision. If the pilot is positive, the next ablation should replace the repeated
-post-decision `t/f` states with a neutral `g` state while retaining a single final
-`T/F` target.
+The 100% decision-state and trace accuracies show that the counting state itself
+transferred to unseen positions, not merely the last answer token. However, the pilot
+does not separate the benefit of intermediate counting supervision from the benefit
+of leaving an answer-bearing state immediately before the final answer. The next
+ablation should emit `t/f` only at the second `X`, replace all later states (including
+the delimiter state) with a neutral `g`, and retain one final `T/F` target.
 
 ## Implementation layout
 
@@ -299,6 +372,7 @@ generalization-distd-scratchpad/
 ├── evaluate.py
 ├── test_scratchpad.py       # state transitions, loss masks, and chained contexts
 ├── run_multiseed.sh         # formal 3-condition x 5-seed sweep
+├── plot_multiseed.py         # validates, summarizes, and plots the formal sweep
 ├── config/
 │   └── basic.py
 ├── data/

@@ -24,7 +24,7 @@ checkpoint_name = 'ckpt.pt'
 data_dir = 'data/distd_scratchpad'
 device = 'cpu'
 seed = 1337
-inference_batch_size = 256
+inference_batch_size = 1024
 num_val = 0                 # 0 = all
 num_test = 0                # 0 = all
 results_csv = 'results.csv'
@@ -162,6 +162,7 @@ def predict_free_running(examples):
 
 def free_running_metrics(examples, answer_predictions, state_predictions):
     answer_correct = 0
+    invalid_answer_count = 0
     class_counts = {'T': [0, 0], 'F': [0, 0]}
     rows = []
 
@@ -179,6 +180,7 @@ def free_running_metrics(examples, answer_predictions, state_predictions):
     ):
         is_answer_correct = answer_pred == label
         answer_correct += is_answer_correct
+        invalid_answer_count += answer_pred not in {'T', 'F'}
         class_counts[label][0] += is_answer_correct
         class_counts[label][1] += 1
 
@@ -217,6 +219,7 @@ def free_running_metrics(examples, answer_predictions, state_predictions):
     count = len(examples)
     metrics = {
         'free_answer_acc': safe_divide(answer_correct, count),
+        'invalid_answer_rate': safe_divide(invalid_answer_count, count),
         'free_T_acc': safe_divide(class_counts['T'][0], class_counts['T'][1]),
         'free_F_acc': safe_divide(class_counts['F'][0], class_counts['F'][1]),
         'free_state_acc': safe_divide(state_correct, state_count),
@@ -258,7 +261,8 @@ def print_split(name, metrics, count):
         f"  answer: teacher {format_metric(metrics['teacher_answer_acc'])} | "
         f"free {format_metric(metrics['free_answer_acc'])} | "
         f"T {format_metric(metrics['free_T_acc'])} | "
-        f"F {format_metric(metrics['free_F_acc'])}"
+        f"F {format_metric(metrics['free_F_acc'])} | "
+        f"invalid {format_metric(metrics['invalid_answer_rate'])}"
     )
     print(
         f"  state : teacher {format_metric(metrics['teacher_state_acc'])} | "
@@ -296,7 +300,7 @@ print_split('held-out test', test_metrics, len(test_examples))
 def append_csv(path, header, rows):
     fresh = not os.path.exists(path) or os.path.getsize(path) == 0
     with open(path, 'a', newline='') as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, lineterminator='\n')
         if fresh:
             writer.writerow(header)
         writer.writerows(rows)
@@ -305,7 +309,8 @@ def append_csv(path, header, rows):
 if log_results:
     metric_names = [
         'teacher_answer_loss', 'teacher_state_loss', 'teacher_answer_acc',
-        'free_answer_acc', 'free_T_acc', 'free_F_acc', 'teacher_state_acc',
+        'free_answer_acc', 'invalid_answer_rate', 'free_T_acc', 'free_F_acc',
+        'teacher_state_acc',
         'free_state_acc', 'trace_exact_acc',
         'invalid_state_rate', 'decision_acc', 'decision_T_acc', 'decision_F_acc',
     ]
