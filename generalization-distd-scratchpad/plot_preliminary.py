@@ -12,10 +12,15 @@ from matplotlib.ticker import PercentFormatter
 HERE = Path(__file__).resolve().parent
 CONDITIONS = ('no_scratchpad', 'dummy', 'meaningful')
 CONDITION_LABELS = ('No\nscratchpad', 'Dummy\nscratchpad', 'Meaningful\nscratchpad')
-SEEN_COLOR = '#4C78A8'
-UNSEEN_COLOR = '#F28E2B'
-TRUE_COLOR = '#59A14F'
-FALSE_COLOR = '#B279A2'
+BACKGROUND = '#191919'
+FOREGROUND = '#F4F4F4'
+MUTED = '#A7A7A7'
+GRID = '#363636'
+CHANCE = '#D0D0D0'
+SEEN_COLOR = '#78A9D8'
+UNSEEN_COLOR = '#DF9254'
+TRUE_COLOR = '#69BD82'
+FALSE_COLOR = '#CB80AA'
 
 
 def parse_args():
@@ -49,22 +54,32 @@ def values(grouped, metric):
     ]
 
 
-def draw_bars(ax, left_values, right_values, left_label, right_label, colors):
+def draw_bars(
+    ax,
+    left_values,
+    right_values,
+    left_label,
+    right_label,
+    colors,
+    title,
+    context,
+):
     x = np.arange(len(CONDITIONS))
-    width = 0.34
+    width = 0.24
+    offset = 0.14
     left_means = [mean(group) for group in left_values]
     right_means = [mean(group) for group in right_values]
 
     left_bars = ax.bar(
-        x - width / 2, left_means, width, label=left_label, color=colors[0]
+        x - offset, left_means, width, color=colors[0]
     )
     right_bars = ax.bar(
-        x + width / 2, right_means, width, label=right_label, color=colors[1]
+        x + offset, right_means, width, color=colors[1]
     )
 
     for centers, groups, bars in (
-        (x - width / 2, left_values, left_bars),
-        (x + width / 2, right_values, right_bars),
+        (x - offset, left_values, left_bars),
+        (x + offset, right_values, right_bars),
     ):
         for center, group, bar in zip(centers, groups, bars):
             if len(group) > 1:
@@ -73,8 +88,8 @@ def draw_bars(ax, left_values, right_values, left_label, right_label, colors):
                     center + offsets,
                     group,
                     s=22,
-                    facecolors='white',
-                    edgecolors='#222222',
+                    facecolors=BACKGROUND,
+                    edgecolors=FOREGROUND,
                     linewidths=0.7,
                     zorder=3,
                 )
@@ -82,7 +97,7 @@ def draw_bars(ax, left_values, right_values, left_label, right_label, colors):
                     center,
                     mean(group),
                     yerr=stdev(group),
-                    color='#222222',
+                    color=FOREGROUND,
                     capsize=3,
                     linewidth=1,
                     zorder=4,
@@ -96,19 +111,73 @@ def draw_bars(ax, left_values, right_values, left_label, right_label, colors):
                 va='bottom',
                 fontsize=9,
                 fontweight='semibold',
+                color=FOREGROUND,
             )
 
-    ax.axhline(50, color='#555555', linestyle=(0, (4, 3)), linewidth=1)
-    ax.set_xticks(x, CONDITION_LABELS)
-    ax.set_ylim(0, 122)
+    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1, alpha=0.8)
+    ax.set_xticks([])
+    for group_index, condition_label in enumerate(CONDITION_LABELS):
+        ax.text(
+            group_index - offset,
+            -0.045,
+            left_label,
+            transform=ax.get_xaxis_transform(),
+            ha='center',
+            va='top',
+            color=MUTED,
+            fontsize=8.5,
+        )
+        ax.text(
+            group_index + offset,
+            -0.045,
+            right_label,
+            transform=ax.get_xaxis_transform(),
+            ha='center',
+            va='top',
+            color=MUTED,
+            fontsize=8.5,
+        )
+        ax.text(
+            group_index,
+            -0.13,
+            condition_label,
+            transform=ax.get_xaxis_transform(),
+            ha='center',
+            va='top',
+            color=FOREGROUND,
+            fontsize=9,
+            fontweight='semibold',
+        )
+
+    ax.set_ylim(0, 110)
     ax.set_yticks([0, 50, 100])
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
-    ax.set_ylabel('Final-answer accuracy')
-    ax.set_xlabel('Experimental condition')
-    ax.grid(axis='y', color='#D9D9D9', linewidth=0.7)
+    ax.set_ylabel('Final-answer accuracy (%)', color=FOREGROUND)
+    ax.set_xlabel('Experimental condition', color=FOREGROUND, labelpad=73)
+    ax.tick_params(axis='y', colors=MUTED)
+    ax.grid(axis='y', color=GRID, linewidth=0.7)
     ax.set_axisbelow(True)
-    ax.spines[['top', 'right']].set_visible(False)
-    ax.legend(frameon=False, loc='upper left', ncols=2)
+    for spine in ax.spines.values():
+        spine.set_color(GRID)
+        spine.set_linewidth(1)
+    ax.set_title(
+        title,
+        loc='left',
+        color=FOREGROUND,
+        fontsize=12.5,
+        fontweight='semibold',
+        pad=31,
+    )
+    ax.text(
+        0,
+        1.025,
+        context,
+        transform=ax.transAxes,
+        ha='left',
+        va='bottom',
+        color=MUTED,
+        fontsize=8.5,
+    )
 
 
 def main():
@@ -119,62 +188,77 @@ def main():
         'font.family': 'DejaVu Sans',
         'font.size': 10,
         'axes.titleweight': 'semibold',
-        'figure.facecolor': 'white',
-        'axes.facecolor': 'white',
+        'figure.facecolor': BACKGROUND,
+        'axes.facecolor': BACKGROUND,
+        'text.color': FOREGROUND,
     })
-    figure, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    figure, axes = plt.subplots(1, 2, figsize=(12, 6.8), sharey=True)
 
     draw_bars(
         axes[0],
         values(grouped, 'val_free_answer_acc'),
         values(grouped, 'heldout_free_answer_acc'),
-        'Seen positions',
-        'Unseen positions',
+        'Seen',
+        'Unseen',
         (SEEN_COLOR, UNSEEN_COLOR),
+        'A. All models learn; only one generalizes',
+        'Positions seen vs. unseen during training',
     )
-    axes[0].set_title('A. All models learn; only one generalizes', loc='left')
 
     draw_bars(
         axes[1],
         values(grouped, 'heldout_free_T_acc'),
         values(grouped, 'heldout_free_F_acc'),
-        'T (distance ≥ 5)',
-        'F (distance < 5)',
+        'T',
+        'F',
         (TRUE_COLOR, FALSE_COLOR),
-    )
-    axes[1].set_title(
-        'B. Why the controls score 50% on unseen positions', loc='left'
+        'B. Why the controls score 50% on unseen positions',
+        'Unseen-position accuracy · T = distance ≥ 5 · F = distance < 5',
     )
     axes[1].set_ylabel('')
 
     figure.suptitle(
         'Preliminary Scratchpad Generalization Result',
-        x=0.06,
-        y=0.98,
+        x=0.015,
+        y=0.965,
         ha='left',
         fontsize=16,
         fontweight='semibold',
+        color=FOREGROUND,
     )
     figure.text(
-        0.06,
-        0.925,
+        0.015,
+        0.918,
         'Seed 1337 · 500 training iterations · NoPE · fixed input length 20',
         ha='left',
-        color='#555555',
+        color=MUTED,
     )
     figure.text(
-        0.06,
         0.015,
-        'Free-running greedy inference · dashed line = chance (50%) · '
-        'preliminary: one model seed, no uncertainty estimate',
+        0.055,
+        'Free-running greedy inference · dashed line = chance (50%)',
         ha='left',
-        color='#555555',
+        color=MUTED,
         fontsize=9,
     )
-    figure.tight_layout(rect=(0.03, 0.07, 0.99, 0.91), w_pad=2.5)
+    figure.text(
+        0.985,
+        0.055,
+        'Preliminary: one model seed, no uncertainty estimate',
+        ha='right',
+        color=MUTED,
+        fontsize=9,
+    )
+    figure.subplots_adjust(
+        left=0.07,
+        right=0.985,
+        top=0.72,
+        bottom=0.28,
+        wspace=0.2,
+    )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(args.output, dpi=200, bbox_inches='tight')
+    figure.savefig(args.output, dpi=200, facecolor=BACKGROUND)
     plt.close(figure)
     print(f'wrote {args.output}')
 
