@@ -43,6 +43,8 @@ repeats the answer-bearing `t/f` state before the final answer.
 
 ![Formal scratchpad generalization result](../figures/formal-multiseed-result.png)
 
+[Vector PDF](../figures/formal-multiseed-result.pdf)
+
 *Figure 1. Dots are individual model seeds. Error bars are sample standard
 deviations. All conditions achieved 100% seen-position answer accuracy at the final
 checkpoint. The invalid-answer panel measures final outputs other than `T` or `F`.*

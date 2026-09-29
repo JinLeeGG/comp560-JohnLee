@@ -274,6 +274,8 @@ all 5,000 seen-position validation examples and all 2,000 unseen-position exampl
 
 ![Formal scratchpad generalization result](figures/formal-multiseed-result.png)
 
+[Vector PDF for papers and presentations](figures/formal-multiseed-result.pdf)
+
 *Figure 1. Dots are individual model seeds. Meaningful states reached 100% unseen-
 position answer and trace accuracy in every seed from the first 500-iteration
 checkpoint onward. The dummy condition often emitted `z` instead of a valid `T/F`

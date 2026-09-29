@@ -42,6 +42,8 @@ The same raw dataset and union vocabulary were used for all three conditions.
 
 ![Preliminary scratchpad generalization result](../figures/preliminary-scratchpad-result.png)
 
+[Vector PDF](../figures/preliminary-scratchpad-result.pdf)
+
 *Figure 1. All three conditions solve examples using positions seen during training,
 but only the meaningful scratchpad transfers to unseen positions. The class breakdown
 shows that both controls obtain 50% by predicting `F` on every unseen-position example.*

@@ -12,15 +12,15 @@ from matplotlib.ticker import PercentFormatter
 HERE = Path(__file__).resolve().parent
 CONDITIONS = ('no_scratchpad', 'dummy', 'meaningful')
 CONDITION_LABELS = ('No\nscratchpad', 'Dummy\nscratchpad', 'Meaningful\nscratchpad')
-BACKGROUND = '#191919'
-FOREGROUND = '#F4F4F4'
-MUTED = '#A7A7A7'
-GRID = '#363636'
-CHANCE = '#D0D0D0'
-SEEN_COLOR = '#78A9D8'
-UNSEEN_COLOR = '#DF9254'
-TRUE_COLOR = '#69BD82'
-FALSE_COLOR = '#CB80AA'
+BACKGROUND = '#FFFFFF'
+FOREGROUND = '#1A1A1A'
+MUTED = '#5F5F5F'
+GRID = '#D9D9D9'
+CHANCE = '#6F6F6F'
+SEEN_COLOR = '#0072B2'
+UNSEEN_COLOR = '#D55E00'
+TRUE_COLOR = '#009E73'
+FALSE_COLOR = '#CC79A7'
 
 
 def parse_args():
@@ -71,10 +71,12 @@ def draw_bars(
     right_means = [mean(group) for group in right_values]
 
     left_bars = ax.bar(
-        x - offset, left_means, width, color=colors[0]
+        x - offset, left_means, width, color=colors[0],
+        edgecolor=FOREGROUND, linewidth=0.5,
     )
     right_bars = ax.bar(
-        x + offset, right_means, width, color=colors[1]
+        x + offset, right_means, width, color=colors[1],
+        edgecolor=FOREGROUND, linewidth=0.5, hatch='///',
     )
 
     for centers, groups, bars in (
@@ -88,7 +90,7 @@ def draw_bars(
                     center + offsets,
                     group,
                     s=22,
-                    facecolors=BACKGROUND,
+                    facecolors='white',
                     edgecolors=FOREGROUND,
                     linewidths=0.7,
                     zorder=3,
@@ -110,11 +112,10 @@ def draw_bars(
                 ha='center',
                 va='bottom',
                 fontsize=9,
-                fontweight='semibold',
                 color=FOREGROUND,
             )
 
-    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1, alpha=0.8)
+    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1)
     ax.set_xticks([])
     for group_index, condition_label in enumerate(CONDITION_LABELS):
         ax.text(
@@ -146,26 +147,28 @@ def draw_bars(
             va='top',
             color=FOREGROUND,
             fontsize=9,
-            fontweight='semibold',
+            fontweight='bold',
         )
 
-    ax.set_ylim(0, 110)
+    ax.set_ylim(0, 105)
     ax.set_yticks([0, 50, 100])
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
-    ax.set_ylabel('Final-answer accuracy (%)', color=FOREGROUND)
-    ax.set_xlabel('Experimental condition', color=FOREGROUND, labelpad=73)
-    ax.tick_params(axis='y', colors=MUTED)
+    ax.set_ylabel('Final-answer accuracy (%)')
+    ax.tick_params(axis='y', colors=FOREGROUND, direction='out', length=3.5)
     ax.grid(axis='y', color=GRID, linewidth=0.7)
     ax.set_axisbelow(True)
-    for spine in ax.spines.values():
-        spine.set_color(GRID)
-        spine.set_linewidth(1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color(FOREGROUND)
+    ax.spines['bottom'].set_color(FOREGROUND)
+    ax.spines['left'].set_linewidth(0.8)
+    ax.spines['bottom'].set_linewidth(0.8)
     ax.set_title(
         title,
         loc='left',
         color=FOREGROUND,
-        fontsize=12.5,
-        fontweight='semibold',
+        fontsize=11,
+        fontweight='bold',
         pad=31,
     )
     ax.text(
@@ -187,12 +190,19 @@ def main():
     plt.rcParams.update({
         'font.family': 'DejaVu Sans',
         'font.size': 10,
-        'axes.titleweight': 'semibold',
+        'axes.titleweight': 'bold',
+        'axes.titlesize': 11,
+        'axes.labelsize': 10,
+        'xtick.labelsize': 9,
+        'ytick.labelsize': 9,
         'figure.facecolor': BACKGROUND,
         'axes.facecolor': BACKGROUND,
         'text.color': FOREGROUND,
+        'axes.labelcolor': FOREGROUND,
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
     })
-    figure, axes = plt.subplots(1, 2, figsize=(12, 6.8), sharey=True)
+    figure, axes = plt.subplots(1, 2, figsize=(10.5, 4.8), sharey=True)
 
     draw_bars(
         axes[0],
@@ -201,7 +211,7 @@ def main():
         'Seen',
         'Unseen',
         (SEEN_COLOR, UNSEEN_COLOR),
-        'A. All models learn; only one generalizes',
+        'A  Seen vs. unseen positions',
         'Positions seen vs. unseen during training',
     )
 
@@ -212,7 +222,7 @@ def main():
         'T',
         'F',
         (TRUE_COLOR, FALSE_COLOR),
-        'B. Why the controls score 50% on unseen positions',
+        'B  Accuracy by answer class',
         'Unseen-position accuracy · T = distance ≥ 5 · F = distance < 5',
     )
     axes[1].set_ylabel('')
@@ -220,30 +230,29 @@ def main():
     figure.suptitle(
         'Preliminary Scratchpad Generalization Result',
         x=0.015,
-        y=0.965,
+        y=0.98,
         ha='left',
-        fontsize=16,
-        fontweight='semibold',
-        color=FOREGROUND,
+        fontsize=14,
+        fontweight='bold',
     )
     figure.text(
         0.015,
-        0.918,
-        'Seed 1337 · 500 training iterations · NoPE · fixed input length 20',
+        0.915,
+        'Seed 1337; 500 training iterations; NoPE; fixed input length = 20',
         ha='left',
         color=MUTED,
     )
     figure.text(
         0.015,
-        0.055,
-        'Free-running greedy inference · dashed line = chance (50%)',
+        0.025,
+        'Free-running greedy inference; hatched bars = unseen positions / F class; dashed line = 50% chance',
         ha='left',
         color=MUTED,
         fontsize=9,
     )
     figure.text(
         0.985,
-        0.055,
+        0.025,
         'Preliminary: one model seed, no uncertainty estimate',
         ha='right',
         color=MUTED,
@@ -252,15 +261,20 @@ def main():
     figure.subplots_adjust(
         left=0.07,
         right=0.985,
-        top=0.72,
-        bottom=0.28,
-        wspace=0.2,
+        top=0.75,
+        bottom=0.25,
+        wspace=0.22,
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(args.output, dpi=200, facecolor=BACKGROUND)
+    figure.savefig(args.output, dpi=300, facecolor=BACKGROUND, bbox_inches='tight')
+    pdf_output = args.output.with_suffix('.pdf')
+    if pdf_output != args.output:
+        figure.savefig(pdf_output, facecolor=BACKGROUND, bbox_inches='tight')
     plt.close(figure)
     print(f'wrote {args.output}')
+    if pdf_output != args.output:
+        print(f'wrote {pdf_output}')
 
 
 if __name__ == '__main__':

@@ -16,12 +16,15 @@ CONDITION_LABELS = ('No scratchpad', 'Dummy tokens', 'Meaningful states')
 SEEDS = (1337, 1338, 1339, 1340, 1341)
 ITERATIONS = (500, 1000, 1500, 2000)
 
-BACKGROUND = '#191919'
-FOREGROUND = '#F4F4F4'
-MUTED = '#A7A7A7'
-GRID = '#363636'
-CHANCE = '#D0D0D0'
-COLORS = ('#78A9D8', '#DF9254', '#69BD82')
+# Publication palette: high contrast on white and distinguishable in print.
+BACKGROUND = '#FFFFFF'
+FOREGROUND = '#1A1A1A'
+MUTED = '#5F5F5F'
+GRID = '#D9D9D9'
+CHANCE = '#6F6F6F'
+PAIR_LINE = '#C8C8C8'
+COLORS = ('#0072B2', '#D55E00', '#009E73')
+MARKERS = ('o', 's', '^')
 
 
 def parse_args():
@@ -168,16 +171,19 @@ def write_summary(path, indexed, invalid_rates):
 
 
 def style_axis(ax, ylabel):
-    ax.set_ylim(0, 108)
+    ax.set_ylim(0, 105)
     ax.set_yticks([0, 25, 50, 75, 100])
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
-    ax.set_ylabel(ylabel, color=FOREGROUND)
-    ax.tick_params(colors=MUTED)
-    ax.grid(axis='y', color=GRID, linewidth=0.7)
+    ax.set_ylabel(ylabel)
+    ax.tick_params(colors=FOREGROUND, direction='out', length=3.5, width=0.8)
+    ax.grid(axis='y', color=GRID, linewidth=0.7, zorder=0)
     ax.set_axisbelow(True)
-    for spine in ax.spines.values():
-        spine.set_color(GRID)
-        spine.set_linewidth(1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color(FOREGROUND)
+    ax.spines['bottom'].set_color(FOREGROUND)
+    ax.spines['left'].set_linewidth(0.8)
+    ax.spines['bottom'].set_linewidth(0.8)
 
 
 def draw_final_accuracy(ax, indexed):
@@ -190,7 +196,13 @@ def draw_final_accuracy(ax, indexed):
 
     for seed_index, _seed in enumerate(SEEDS):
         values = [group[seed_index] for group in by_condition]
-        ax.plot(x + jitter[seed_index], values, color=MUTED, alpha=0.35, linewidth=0.8)
+        ax.plot(
+            x + jitter[seed_index],
+            values,
+            color=PAIR_LINE,
+            linewidth=0.8,
+            zorder=1,
+        )
 
     for condition_index, (values, color) in enumerate(zip(by_condition, COLORS)):
         ax.scatter(
@@ -198,8 +210,8 @@ def draw_final_accuracy(ax, indexed):
             values,
             s=32,
             color=color,
-            edgecolor=BACKGROUND,
-            linewidth=0.7,
+            edgecolor=FOREGROUND,
+            linewidth=0.5,
             zorder=3,
         )
         average = mean(values)
@@ -212,7 +224,7 @@ def draw_final_accuracy(ax, indexed):
             markersize=6,
             color=FOREGROUND,
             markerfacecolor=color,
-            markeredgecolor=BACKGROUND,
+            markeredgecolor=FOREGROUND,
             capsize=4,
             linewidth=1.2,
             zorder=4,
@@ -224,19 +236,20 @@ def draw_final_accuracy(ax, indexed):
             transform=ax.get_xaxis_transform(),
             ha='center',
             va='bottom',
-            color=FOREGROUND,
             fontsize=9,
         )
 
-    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1, alpha=0.8)
+    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1)
     ax.set_xticks(x, CONDITION_LABELS)
-    ax.set_xlabel('Experimental condition', color=FOREGROUND)
-    style_axis(ax, 'Unseen-position answer accuracy')
-    ax.set_title('A. Final result at 2,000 iterations', loc='left', pad=32)
+    ax.set_xlabel('Condition')
+    style_axis(ax, 'Unseen-position accuracy (%)')
+    ax.set_title('A  Final accuracy (2,000 iterations)', loc='left', pad=30)
 
 
 def draw_learning_curve(ax, indexed):
-    for condition, label, color in zip(CONDITIONS, CONDITION_LABELS, COLORS):
+    for condition, label, color, marker in zip(
+        CONDITIONS, CONDITION_LABELS, COLORS, MARKERS
+    ):
         averages = []
         spreads = []
         for iteration in ITERATIONS:
@@ -251,22 +264,22 @@ def draw_learning_curve(ax, indexed):
             yerr=spreads,
             label=label,
             color=color,
-            marker='o',
-            markersize=5,
+            marker=marker,
+            markersize=5.5,
+            markeredgecolor=FOREGROUND,
+            markeredgewidth=0.45,
             linewidth=1.8,
             capsize=3,
         )
 
-    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1, alpha=0.8)
+    ax.axhline(50, color=CHANCE, linestyle=(0, (4, 3)), linewidth=1)
     ax.set_xticks(ITERATIONS)
-    ax.set_xlabel('Training iteration', color=FOREGROUND)
-    style_axis(ax, 'Mean unseen-position accuracy')
-    ax.set_title('B. Generalization across checkpoints', loc='left', pad=32)
+    ax.set_xlabel('Training iteration')
+    style_axis(ax, 'Mean unseen-position accuracy (%)')
+    ax.set_title('B  Accuracy across checkpoints', loc='left', pad=30)
     legend = ax.legend(
-        loc='lower right', frameon=False, labelcolor=FOREGROUND, fontsize=8.5
+        loc='lower right', frameon=False, fontsize=8.5, handlelength=2.2
     )
-    for text in legend.get_texts():
-        text.set_color(FOREGROUND)
 
 
 def draw_invalid_answers(ax, invalid_rates):
@@ -282,8 +295,9 @@ def draw_invalid_answers(ax, invalid_rates):
             values,
             s=34,
             color=color,
-            edgecolor=BACKGROUND,
-            linewidth=0.7,
+            marker=MARKERS[condition_index],
+            edgecolor=FOREGROUND,
+            linewidth=0.5,
             zorder=3,
         )
         average = mean(values)
@@ -301,14 +315,13 @@ def draw_invalid_answers(ax, invalid_rates):
             transform=ax.get_xaxis_transform(),
             ha='center',
             va='bottom',
-            color=FOREGROUND,
             fontsize=9,
         )
 
     ax.set_xticks(x, CONDITION_LABELS)
-    ax.set_xlabel('Experimental condition', color=FOREGROUND)
-    style_axis(ax, 'Invalid final answers (not T or F)')
-    ax.set_title('C. Why dummy accuracy falls below chance', loc='left', pad=32)
+    ax.set_xlabel('Condition')
+    style_axis(ax, 'Invalid final answers (%)')
+    ax.set_title('C  Invalid outputs at 2,000 iterations', loc='left', pad=30)
 
 
 def main():
@@ -320,13 +333,20 @@ def main():
     plt.rcParams.update({
         'font.family': 'DejaVu Sans',
         'font.size': 10,
-        'axes.titleweight': 'semibold',
+        'axes.titleweight': 'bold',
+        'axes.titlesize': 11,
+        'axes.labelsize': 10,
+        'xtick.labelsize': 9,
+        'ytick.labelsize': 9,
+        'legend.fontsize': 8.5,
         'figure.facecolor': BACKGROUND,
         'axes.facecolor': BACKGROUND,
         'text.color': FOREGROUND,
         'axes.labelcolor': FOREGROUND,
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
     })
-    figure, axes = plt.subplots(1, 3, figsize=(15, 5.9))
+    figure, axes = plt.subplots(1, 3, figsize=(13.2, 4.7))
     draw_final_accuracy(axes[0], indexed)
     draw_learning_curve(axes[1], indexed)
     draw_invalid_answers(axes[2], invalid_rates)
@@ -334,30 +354,30 @@ def main():
     figure.suptitle(
         'Formal Scratchpad Generalization Result',
         x=0.015,
-        y=0.975,
+        y=0.98,
         ha='left',
-        fontsize=16,
-        fontweight='semibold',
-        color=FOREGROUND,
+        fontsize=14,
+        fontweight='bold',
     )
     figure.text(
         0.015,
-        0.93,
-        'Five paired model seeds · NoPE · fixed input length 20 · same raw examples',
+        0.925,
+        'Five paired model seeds; NoPE; fixed input length = 20; free-running greedy inference',
         ha='left',
         color=MUTED,
+        fontsize=9,
     )
     figure.text(
         0.015,
-        0.035,
-        'Free-running greedy inference · dots = individual seeds · diamond/line = mean · error bars = sample SD · dashed = 50% chance',
+        0.025,
+        'Points: individual seeds; diamond/bar: mean; error bars: sample SD; dashed line: 50% chance',
         ha='left',
         color=MUTED,
         fontsize=9,
     )
     figure.text(
         0.985,
-        0.035,
+        0.025,
         'Seen-position accuracy at 2,000 iterations: 100% for every condition and seed',
         ha='right',
         color=MUTED,
@@ -367,15 +387,20 @@ def main():
         left=0.055,
         right=0.985,
         top=0.78,
-        bottom=0.18,
-        wspace=0.28,
+        bottom=0.20,
+        wspace=0.33,
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(args.output, dpi=200, facecolor=BACKGROUND)
+    figure.savefig(args.output, dpi=300, facecolor=BACKGROUND, bbox_inches='tight')
+    pdf_output = args.output.with_suffix('.pdf')
+    if pdf_output != args.output:
+        figure.savefig(pdf_output, facecolor=BACKGROUND, bbox_inches='tight')
     plt.close(figure)
     print(f'wrote {args.summary}')
     print(f'wrote {args.output}')
+    if pdf_output != args.output:
+        print(f'wrote {pdf_output}')
 
 
 if __name__ == '__main__':
