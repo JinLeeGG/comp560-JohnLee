@@ -45,6 +45,7 @@ def parse_args():
         type=Path,
         default=HERE / 'figures' / 'formal-multiseed-result.png',
     )
+    parser.add_argument('--pe_label', default='NoPE')
     return parser.parse_args()
 
 
@@ -362,7 +363,8 @@ def main():
     figure.text(
         0.015,
         0.925,
-        'Five paired model seeds; NoPE; fixed input length = 20; free-running greedy inference',
+        f'Five paired model seeds; {args.pe_label}; fixed input length = 20; '
+        'free-running greedy inference',
         ha='left',
         color=MUTED,
         fontsize=9,
