@@ -18,6 +18,16 @@ reads, helps it succeed. The experiment is run with NoPE first, then repeated wi
 This follows the distance experiment, where the scratchpad raised accuracy on unseen
 positions to 100% ([results](../generalization-distd-scratchpad/README.md)).
 
+## Results so far
+
+### Step 1: NoPE without a scratchpad
+
+![Step 1 unseen-position accuracy by count](log/figures/step1_unseen_by_count.png)
+
+All five seeds were 100% on seen positions. On unseen positions, the mean was 89.9%
+for counts 1-3: two seeds were perfect, and almost every error answered 0 when the
+unseen half had a single `X`. Details: [Step 1 log](log/2026-10-06-step1-nope-baseline.md).
+
 ## The task
 
 ```text
