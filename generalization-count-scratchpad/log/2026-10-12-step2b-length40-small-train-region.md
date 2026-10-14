@@ -106,15 +106,16 @@ and 1339 never answered 1 on a two-`X` input: they saw both `X`s or neither.
 
 How the three splits compare (all NoPE, no scratchpad):
 
-![Unseen-position accuracy by number of X for the three splits](figures/step2b_settings_by_count.png)
+![Unseen-position accuracy for the three splits](figures/step2b_settings_comparison.png)
 
-[Vector PDF](figures/step2b_settings_by_count.pdf)
+[Vector PDF](figures/step2b_settings_comparison.pdf)
 
-*Figure 2. Unseen-position accuracy by number of X for the three splits tried so far.
-L is the input length; the second line gives the X positions seen in training. Bars and
-thick lines: mean over five seeds; dots: individual seeds. Dashed line in the last
-panel: the bar fixed before running (about 70%). Only setting B (L=40, seen 0-9) falls
-below it, and it is the only split where inputs with two X also fail.*
+*Figure 2. Unseen-position accuracy (counts 1-3) of the plain model (NoPE, no
+scratchpad) for the three splits tried so far. Bars: mean over five seeds (value at the
+bottom); dots: individual seeds. Dashed line: the bar fixed before running (70%). Only
+the last split (length 40, training on positions 0-9; dark bar) falls below it. The
+table below breaks this down by number of X: this is also the only split where inputs
+with two X fail.*
 
 | Split | Length | Seen `X` positions | Unseen, counts 1-3 | k=1 | k=2 | k=3 | Perfect seeds |
 |---|---:|---|---:|---:|---:|---:|---:|

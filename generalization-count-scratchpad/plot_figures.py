@@ -19,6 +19,7 @@ from collections import defaultdict
 import matplotlib
 
 matplotlib.use('Agg')
+import matplotlib.lines  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -219,35 +220,66 @@ def jitter(n, width=0.16):
 
 
 def step2b_settings():
-    """Unseen-position accuracy by count for the three splits (no scratchpad, NoPE)."""
+    """Which split makes the plain model fail? One bar per split, chosen split highlighted."""
     settings = [
-        # L = input length; second line = X positions seen in training.
-        ('results_step1_nope.csv', 'L=20\n0\u20139'),
-        ('results_step2A_nope.csv', 'L=40\n0\u201319'),
-        ('results_step2B_nope.csv', 'L=40\n0\u20139'),
+        ('results_step1_nope.csv', 'Length 20\ntrain on 0\u20139', False),
+        ('results_step2A_nope.csv', 'Length 40\ntrain on 0\u201319', False),
+        ('results_step2B_nope.csv', 'Length 40\ntrain on 0\u20139', True),
     ]
-    panels = [('acc_k1', '1 X'), ('acc_k2', '2 X'), ('acc_k3', '3 X'),
-              ('acc_k1plus', 'All (1-3 X)')]
-    color = CONDITION_COLORS['no_scratchpad']
-    data = {csv_name: final_rows(csv_name) for csv_name, _ in settings}
+    blue = CONDITION_COLORS['no_scratchpad']
+    fig, ax = plt.subplots(figsize=(3.6, 2.4))
+    # The line stops short of its label so the text never sits on the dashes.
+    ax.hlines(70, -0.55, 2.33, color=MUTED, lw=0.8, ls=(0, (4, 3)), zorder=1)
+    ax.text(2.37, 70, 'pre-set\nbar (70%)', ha='left', va='center', fontsize=7,
+            color=MUTED)
+    for x, (csv_name, _, chosen) in enumerate(settings):
+        values = [100 * float(row['heldout_acc_k1plus']) for row in final_rows(csv_name)]
+        mean = sum(values) / len(values)
+        ax.bar(x, mean, width=0.6, color=blue, alpha=0.85 if chosen else 0.22, lw=0,
+               zorder=2)
+        ax.scatter([x + dx for dx in jitter(len(values), width=0.14)], values, s=10,
+                   color=INK if chosen else blue, edgecolor='white', linewidth=0.4,
+                   zorder=4)
+        ax.text(x, 4, f'{mean:.1f}%', ha='center', va='bottom', fontsize=8,
+                color='white' if chosen else INK, fontweight='bold', zorder=5)
+    ax.set_xticks(range(len(settings)))
+    ax.set_xticklabels([label for _, label, _ in settings], fontsize=7.3)
+    ax.set_xlim(-0.55, len(settings) - 0.05)
+    ax.set_ylim(0, 105)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_ylabel('Unseen-position accuracy (%)')
+    ax.grid(axis='y', color=GRID, lw=0.6, zorder=0)
+    ax.set_axisbelow(True)
+    ax.tick_params(axis='x', length=0)
+    for side in ('top', 'right'):
+        ax.spines[side].set_visible(False)
+    save(fig, 'step2b_settings_comparison')
 
-    fig, axes = plt.subplots(1, 4, figsize=(5.5, 2.15), sharey=True)
-    for ax, (key, title) in zip(axes, panels):
-        for x, (csv_name, _) in enumerate(settings):
-            values = [100 * float(row[f'heldout_{key}']) for row in data[csv_name]]
+
+CONDITIONS = ('no_scratchpad', 'dummy', 'meaningful')
+# The pre-set main metric comes first; the per-count panels break it down.
+COUNT_PANELS = [('acc_k1plus', 'All (1-3 X)'), ('acc_k1', '1 X'), ('acc_k2', '2 X'),
+                ('acc_k3', '3 X')]
+
+
+def condition_panels(axes, results_csv):
+    """One panel per count: x = scratchpad condition, bar = mean, dots = seeds."""
+    data = {condition: final_rows(results_csv, condition) for condition in CONDITIONS}
+    for ax, (key, title) in zip(axes, COUNT_PANELS):
+        for x, condition in enumerate(CONDITIONS):
+            color = CONDITION_COLORS[condition]
+            values = [100 * float(row[f'heldout_{key}']) for row in data[condition]]
             mean = sum(values) / len(values)
             ax.bar(x, mean, width=0.62, color=color, alpha=0.25, lw=0, zorder=2)
             ax.hlines(mean, x - 0.31, x + 0.31, color=color, lw=1.4, zorder=3)
             ax.scatter([x + dx for dx in jitter(len(values))], values, s=9, color=color,
-                       edgecolor='white', linewidth=0.4, zorder=4)
-        if key == 'acc_k1plus':
-            ax.axhline(70, color=MUTED, lw=0.8, ls=(0, (4, 3)), zorder=1)
-            ax.text(2.45, 72, 'pre-set bar', ha='right', va='bottom', fontsize=6.5,
-                    color=MUTED)
+                       marker=CONDITION_MARKERS[condition], edgecolor='white',
+                       linewidth=0.4, zorder=4)
+            ax.text(x, 3, f'{mean:.0f}', ha='center', va='bottom', fontsize=7,
+                    color=INK, fontweight='bold', zorder=5)
         ax.set_title(title, fontsize=8, color=INK, pad=4)
-        ax.set_xticks(range(len(settings)))
-        ax.set_xticklabels([label for _, label in settings], fontsize=6.8)
-        ax.set_xlim(-0.6, len(settings) - 0.4)
+        ax.set_xticks([])
+        ax.set_xlim(-0.6, len(CONDITIONS) - 0.4)
         ax.set_ylim(0, 105)
         ax.set_yticks([0, 25, 50, 75, 100])
         ax.grid(axis='y', color=GRID, lw=0.6, zorder=0)
@@ -255,9 +287,115 @@ def step2b_settings():
         ax.tick_params(axis='x', length=0)
         for side in ('top', 'right'):
             ax.spines[side].set_visible(False)
+
+
+def condition_legend(fig, y=1.0):
+    handles = [
+        matplotlib.lines.Line2D([], [], color=CONDITION_COLORS[c], marker=CONDITION_MARKERS[c],
+                                lw=0, ms=5, mec='white', mew=0.5, label=CONDITION_LABELS[c])
+        for c in CONDITIONS
+    ]
+    fig.legend(handles=handles, loc='lower center', bbox_to_anchor=(0.5, y), ncol=3,
+               frameon=False, handletextpad=0.3, columnspacing=1.6)
+
+
+def scratchpad_main(results_csv, name):
+    fig, axes = plt.subplots(1, 4, figsize=(5.5, 2.0), sharey=True)
+    condition_panels(axes, results_csv)
     axes[0].set_ylabel('Unseen-position accuracy (%)')
     fig.tight_layout(w_pad=0.6)
-    save(fig, 'step2b_settings_by_count')
+    condition_legend(fig)
+    save(fig, name)
+
+
+def scratchpad_position(predictions_csv, name):
+    """One row per condition in the B-1 format, so the seed bands never overlap."""
+    fig, axes = plt.subplots(len(CONDITIONS), 1, figsize=(5.5, 3.9), sharex=True)
+    for row, (ax, condition) in enumerate(zip(axes, CONDITIONS)):
+        position_axes(ax, length=40, seen_end=10, label_regions=(row == 0))
+        position_curve(ax, load_five_seeds(predictions_csv, condition), condition)
+        # Inside the seen region, where every curve sits at 100%, so it covers no data.
+        ax.text(0.3, 45, CONDITION_LABELS[condition], ha='left', va='center',
+                fontsize=7.5, color=INK)
+    axes[-1].set_xlabel('Position of the single X')
+    fig.supylabel('Accuracy on single-X inputs (%)', fontsize=8.5, x=0.01)
+    fig.tight_layout(h_pad=0.4)
+    save(fig, name)
+
+
+ERROR_TYPES = [
+    ('missed', 'Missed the +1 at an X', '#4a3aa7'),
+    ('dropped', 'Dropped the count after an X', '#e87ba4'),
+    ('answer', 'Count written right, answer wrong', '#eda100'),
+]
+
+
+def classify_trace_error(body, written):
+    """Where a wrong meaningful-scratchpad answer first goes wrong."""
+    count = 0
+    for index, token in enumerate(body):
+        count += token == 'X'
+        if written[index] != str(count):
+            if not written[index].isdigit() or int(written[index]) > count:
+                return 'other'
+            return 'missed' if token == 'X' else 'dropped'
+    return 'answer'
+
+
+def meaningful_error_rates(predictions_csv):
+    """{seed: {error type: % of unseen inputs with 1-3 X}} at the final checkpoint."""
+    counts = defaultdict(lambda: defaultdict(int))
+    totals = defaultdict(int)
+    with open(os.path.join(HERE, predictions_csv)) as file:
+        for row in csv.DictReader(file):
+            if (row['condition'] != 'meaningful' or row['split'] != 'test'
+                    or row['iteration'] != ITERATION or row['gold'] == '0'):
+                continue
+            totals[row['seed']] += 1
+            if row['correct'] != '1':
+                counts[row['seed']][classify_trace_error(row['body'], row['pred_states'])] += 1
+    return {
+        seed: {kind: 100 * counts[seed][kind] / totals[seed]
+               for kind in ('missed', 'dropped', 'answer', 'other')}
+        for seed in sorted(totals)
+    }
+
+
+def scratchpad_errors(predictions_csv, name):
+    rates = meaningful_error_rates(predictions_csv)
+    if any(by_kind['other'] for by_kind in rates.values()):
+        raise ValueError(f'unclassified meaningful errors: {rates}')
+    seeds = list(rates)
+    fig, ax = plt.subplots(figsize=(3.4, 2.1))
+    bottoms = [0.0] * len(seeds)
+    for kind, label, color in ERROR_TYPES:
+        heights = [rates[seed][kind] for seed in seeds]
+        ax.bar(range(len(seeds)), heights, bottom=bottoms, width=0.6, color=color,
+               edgecolor='white', linewidth=0.6, label=label, zorder=2)
+        bottoms = [b + h for b, h in zip(bottoms, heights)]
+    ax.set_xticks(range(len(seeds)))
+    ax.set_xticklabels([f'seed {i + 1}' for i in range(len(seeds))], fontsize=7)
+    ax.set_ylabel('Wrong answers (%)')
+    ax.grid(axis='y', color=GRID, lw=0.6, zorder=0)
+    ax.set_axisbelow(True)
+    ax.tick_params(axis='x', length=0)
+    for side in ('top', 'right'):
+        ax.spines[side].set_visible(False)
+    ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1.0), frameon=False,
+              fontsize=7, handlelength=1.2)
+    save(fig, name)
+
+
+def step3_main():
+    scratchpad_main('results_step3_nope.csv', 'step3_nope_accuracy_by_count')
+
+
+def step3_position():
+    scratchpad_position('predictions_step3_nope.csv', 'step3_nope_position_accuracy')
+
+
+def step3_errors():
+    scratchpad_errors('predictions_step3_nope.csv', 'step3_nope_meaningful_errors')
 
 
 FIGURES = {
@@ -265,6 +403,9 @@ FIGURES = {
     'step2a_position_heatmap': step2a_position_heatmap,
     'step2b_position': step2b_position,
     'step2b_settings': step2b_settings,
+    'step3_main': step3_main,
+    'step3_position': step3_position,
+    'step3_errors': step3_errors,
 }
 
 if __name__ == '__main__':
