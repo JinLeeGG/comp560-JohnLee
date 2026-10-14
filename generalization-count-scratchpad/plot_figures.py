@@ -275,8 +275,9 @@ def condition_panels(axes, results_csv):
             ax.scatter([x + dx for dx in jitter(len(values))], values, s=9, color=color,
                        marker=CONDITION_MARKERS[condition], edgecolor='white',
                        linewidth=0.4, zorder=4)
-            ax.text(x, 3, f'{mean:.0f}', ha='center', va='bottom', fontsize=7,
-                    color=INK, fontweight='bold', zorder=5)
+            # Under the axis, so low bars and seed markers never cover it.
+            ax.text(x, -4, f'{mean:.0f}', ha='center', va='top', fontsize=7,
+                    color=INK, fontweight='bold', clip_on=False)
         ax.set_title(title, fontsize=8, color=INK, pad=4)
         ax.set_xticks([])
         ax.set_xlim(-0.6, len(CONDITIONS) - 0.4)
@@ -375,6 +376,7 @@ def scratchpad_errors(predictions_csv, name):
         bottoms = [b + h for b, h in zip(bottoms, heights)]
     ax.set_xticks(range(len(seeds)))
     ax.set_xticklabels([f'seed {i + 1}' for i in range(len(seeds))], fontsize=7)
+    ax.set_ylim(0, max(bottoms) * 1.1)
     ax.set_ylabel('Wrong answers (%)')
     ax.grid(axis='y', color=GRID, lw=0.6, zorder=0)
     ax.set_axisbelow(True)
@@ -398,6 +400,33 @@ def step3_errors():
     scratchpad_errors('predictions_step3_nope.csv', 'step3_nope_meaningful_errors')
 
 
+def step4_main():
+    scratchpad_main('results_step4_rope.csv', 'step4_rope_accuracy_by_count')
+
+
+def step4_position():
+    scratchpad_position('predictions_step4_rope.csv', 'step4_rope_position_accuracy')
+
+
+def step4_errors():
+    scratchpad_errors('predictions_step4_rope.csv', 'step4_rope_meaningful_errors')
+
+
+def step4_pe_comparison():
+    """NoPE (top) vs RoPE (bottom), same panels as the per-step main figures."""
+    fig, axes = plt.subplots(2, 4, figsize=(5.5, 3.7), sharey=True)
+    for row, (results_csv, pe_label) in enumerate(
+            [('results_step3_nope.csv', 'NoPE'), ('results_step4_rope.csv', 'RoPE')]):
+        condition_panels(axes[row], results_csv)
+        axes[row][0].set_ylabel(f'{pe_label}\nunseen accuracy (%)')
+        if row == 1:
+            for ax in axes[row]:
+                ax.set_title('')
+    fig.tight_layout(w_pad=0.6, h_pad=1.6)
+    condition_legend(fig)
+    save(fig, 'step4_nope_vs_rope_accuracy_by_count')
+
+
 FIGURES = {
     'step2a_position': step2a_position,
     'step2a_position_heatmap': step2a_position_heatmap,
@@ -406,6 +435,10 @@ FIGURES = {
     'step3_main': step3_main,
     'step3_position': step3_position,
     'step3_errors': step3_errors,
+    'step4_main': step4_main,
+    'step4_position': step4_position,
+    'step4_errors': step4_errors,
+    'step4_pe_comparison': step4_pe_comparison,
 }
 
 if __name__ == '__main__':

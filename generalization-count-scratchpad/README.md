@@ -1,7 +1,7 @@
 # Counting Task with Scratchpad Tokens: Experiment Plan
 
-**Status:** Steps 1-4 done. Step 2 chose setting B (length 40, train 0-9, test 10-39);
-Steps 3 (NoPE) and 4 (RoPE) ran on it. Logs and figures for Steps 2-4 in progress  
+**Status:** Steps 1-4 done (logs below). Step 2 chose setting B (length 40, `X` seen in
+positions 0-9, tested on 10-39); Steps 3 (NoPE) and 4 (RoPE) ran on it  
 **Date:** October 6, 2026 (updated October 13, 2026)
 
 ## Summary
@@ -18,6 +18,10 @@ reads, helps it succeed. The experiment is run with NoPE first, then repeated wi
 This follows the distance experiment, where the scratchpad raised accuracy on unseen
 positions to 100% ([results](../generalization-distd-scratchpad/README.md)).
 
+The plain model already did well at length 20 (Step 1), so Steps 3 and 4 use the
+meeting note's harder variant: a 40-character string with `X`s only in positions 0-9
+during training and only in 10-39 at test (setting B, Step 2).
+
 ## Results so far
 
 ### Step 1: NoPE without a scratchpad
@@ -27,6 +31,31 @@ positions to 100% ([results](../generalization-distd-scratchpad/README.md)).
 All five seeds were 100% on seen positions. On unseen positions, the mean was 89.9%
 for counts 1-3: two seeds were perfect, and almost every error answered 0 when the
 unseen half had a single `X`. Details: [Step 1 log](log/2026-10-06-step1-nope-baseline.md).
+
+### Step 2: Making the task harder
+
+- Setting A (length 40, `X` seen in 0-19, tested on 20-39): 94.7% on unseen positions,
+  too easy. [Step 2A log](log/2026-10-12-step2a-length40-half-split.md)
+- Setting B (length 40, `X` seen in 0-9, tested on 10-39): 56.2%, below the pre-set bar
+  of 70%; every seed stops seeing a lone `X` near position 16. Used for Steps 3-4.
+  [Step 2B log](log/2026-10-12-step2b-length40-small-train-region.md)
+
+### Steps 3 and 4: Scratchpad comparison (setting B)
+
+![NoPE vs RoPE: unseen-position accuracy by number of X and condition](log/figures/step4_nope_vs_rope_accuracy_by_count.png)
+
+| | No scratchpad | Dummy | Meaningful |
+|---|---:|---:|---:|
+| NoPE (Step 3) | 56.2% | 83.7% | 91.1% |
+| RoPE (Step 4) | 12.4% | 11.7% | 47.9% |
+
+- **NoPE:** the meaningful scratchpad is best, and three of five seeds count a lone `X`
+  at every unseen position. The dummy scratchpad also helps a lot, which is not
+  explained yet. Remaining errors: the model writes the `+1`, then drops the count.
+  [Step 3 log](log/2026-10-12-step3-nope-scratchpad.md)
+- **RoPE:** fails without a scratchpad (12.4%); the dummy does not help; the meaningful
+  scratchpad helps in every seed but stays far from 100%, mostly because the model
+  does not add 1 at an unseen `X`. [Step 4 log](log/2026-10-13-step4-rope-scratchpad.md)
 
 ## The task
 

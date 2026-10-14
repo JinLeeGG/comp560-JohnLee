@@ -14,7 +14,7 @@ perfect. This meets the bar fixed before running (100% seen for every seed, unse
 at most about 70%, at most one perfect seed), so **setting B is used for the scratchpad
 comparison** (Steps 3 and 4).
 
-The failure has a clear form. Every seed counts a lone `X` correctly up to about
+The failure has a clear form. Every seed counts a lone `X` almost perfectly up to about
 position 15 and then stops seeing it: from position 21 on, **no seed ever counted a
 lone `X`** (0% at every position for every seed). Inputs with two `X`s were right only
 about half the time, and mostly when one `X` was close to the training region. Inputs
@@ -64,8 +64,8 @@ DATA_DIR=data/count_scratchpad_L40_seen10 RUN_PREFIX=out_step2B_nope RESULTS_CSV
 *Figure 1. Accuracy on inputs with a single X, by the X's position (setting B: length
 40, X seen in positions 0-9; NoPE, no scratchpad). Positions are numbered from 0
 (0-39). Line: mean over five seeds; band: range across seeds. The gray region marks
-positions seen in training. All seeds count a lone X up to about position 15, fall
-below 50% at position 16 or 17, and score 0% at every position from 21 on, answering
+positions seen in training. All seeds count a lone X almost perfectly up to about
+position 15, fall below 50% at position 16 or 17, and score 0% at every position from 21 on, answering
 0. Compare with setting A (Step 2A, Figure 1), where training on positions 0-19 kept
 every seed perfect up to position 29.*
 

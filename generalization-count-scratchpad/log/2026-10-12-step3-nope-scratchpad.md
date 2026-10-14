@@ -71,12 +71,11 @@ DATA_DIR=data/count_scratchpad_L40_seen10 BLOCK_SIZE=96 POS_TYPE=none CONDITIONS
 
 *Figure 1. Unseen-position accuracy at 2,000 iterations for each scratchpad condition
 (NoPE, setting B). The first panel is the pre-set main metric (counts 1-3); the others
-break it down by number of X. Bars and thick lines: mean over five seeds (value at the
-bottom); markers: individual seeds. Every condition and seed scored 100% on seen
-positions. The meaningful
-scratchpad is highest for a single X, where three seeds are perfect; with two X, the
-dummy and meaningful scratchpads are about equal; with three X, every condition is
-near 100%.*
+break it down by number of X. Bars and thick lines: mean over five seeds (value under
+each bar); markers: individual seeds. Every condition and seed scored 100% on seen
+positions. The meaningful scratchpad is highest for a single X, where three seeds are
+perfect; with two X, the dummy and meaningful scratchpads are about equal; with three
+X, every condition is near 100%.*
 
 Final checkpoint (2,000 iterations), unseen positions:
 
@@ -198,9 +197,8 @@ Same model and seeds, NoPE, unseen-position accuracy at 2,000 iterations:
 **What worked:** The meaningful scratchpad gave the best unseen-position accuracy
 overall and for a single `X` (tying the dummy scratchpad on two `X`s), and it removed
 the position limit entirely in three of five seeds: those seeds counted a lone `X` at
-all 30 unseen positions. The
-written counts show that the model recognizes an `X` at unseen positions and adds 1
-almost every time (99.6%).
+all 30 unseen positions. The written counts show that the model recognizes an `X` at
+unseen positions and adds 1 almost every time (99.6%).
 
 **What didn't work:** Two seeds still lost a lone `X` far from the training region, and
 84% of the remaining errors have the same form: the model writes the `+1` and then
