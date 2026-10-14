@@ -1,9 +1,11 @@
 """Evaluate one checkpoint on seen-position validation and unseen-position test.
 
-Step 1 supports the no-scratchpad condition, where the model reads the whole input
-and predicts the count in one forward pass (teacher-forced and free-running are the
-same).  The primary metric is held-out accuracy on counts 1-3: an input with no X has
-no X position, so count 0 is the same in both pools and is reported separately.
+Without a scratchpad, the model reads the whole input and predicts the count in one
+forward pass.  With a scratchpad (dummy or meaningful), evaluation is free-running:
+the model writes its own state after every body token and keeps it in the context,
+then answers after ':'.  The primary metric is held-out accuracy on counts 1-3: an
+input with no X has no X position, so count 0 is the same in both pools and is
+reported separately.
 """
 import csv
 import os
@@ -16,7 +18,12 @@ from torch.nn import functional as F
 
 from dataset import load_meta, load_raw_examples
 from engine import MicroTransformer, MicroTransformerConfig
-from scratchpad import check_condition
+from scratchpad import (
+    allowed_state_tokens,
+    check_condition,
+    gold_state_tokens,
+    initial_state_token,
+)
 
 
 # ---------------------------- config (overridable) ----------------------------
@@ -76,28 +83,53 @@ model.eval()
 
 @torch.no_grad()
 def predict(examples):
-    """Greedy answer token and answer cross-entropy for each example."""
+    """Greedy answers, written state traces, and answer cross-entropy."""
     predictions = []
+    traces = []
     loss_sum = 0.0
     for start in range(0, len(examples), inference_batch_size):
         batch = examples[start:start + inference_batch_size]
-        contexts = torch.tensor(
-            [[stoi[token] for token in body + ':'] for body, _ in batch],
-            dtype=torch.long,
-            device=device,
-        )
+        if condition == 'no_scratchpad':
+            contexts = torch.tensor(
+                [[stoi[token] for token in body + ':'] for body, _ in batch],
+                dtype=torch.long,
+                device=device,
+            )
+            traces.extend('' for _ in batch)
+        else:
+            contexts = torch.full(
+                (len(batch), 1), stoi[initial_state_token(condition)],
+                dtype=torch.long, device=device,
+            )
+            state_columns = []
+            for index in range(meta['length']):
+                raw_ids = torch.tensor(
+                    [stoi[body[index]] for body, _ in batch],
+                    dtype=torch.long,
+                    device=device,
+                ).unsqueeze(1)
+                contexts = torch.cat((contexts, raw_ids), dim=1)
+                state_ids = model(contexts)[:, -1, :].argmax(-1)
+                state_columns.append(state_ids)
+                contexts = torch.cat((contexts, state_ids.unsqueeze(1)), dim=1)
+            colon = torch.full((len(batch), 1), stoi[':'], dtype=torch.long, device=device)
+            contexts = torch.cat((contexts, colon), dim=1)
+            state_matrix = torch.stack(state_columns, dim=1).tolist()
+            traces.extend(
+                ''.join(itos[int(token_id)] for token_id in row) for row in state_matrix
+            )
         gold = torch.tensor([stoi[label] for _, label in batch], device=device)
         logits = model(contexts)[:, -1, :]
         loss_sum += F.cross_entropy(logits, gold, reduction='sum').item()
         predictions.extend(itos[int(token_id)] for token_id in logits.argmax(-1).tolist())
-    return predictions, loss_sum / len(examples)
+    return predictions, traces, loss_sum / len(examples)
 
 
 def safe_divide(numerator, denominator):
     return numerator / denominator if denominator else None
 
 
-def split_metrics(examples, predictions, answer_loss):
+def split_metrics(examples, predictions, traces, answer_loss):
     columns = count_tokens + ['other']
     confusion = {gold: {pred: 0 for pred in columns} for gold in count_tokens}
     per_count = {gold: [0, 0] for gold in count_tokens}
@@ -115,8 +147,28 @@ def split_metrics(examples, predictions, answer_loss):
         elif int(pred) > int(gold):
             over += 1
 
+    # Scratchpad states written by the model itself (free-running).
+    allowed_states = set(allowed_state_tokens(condition, count_tokens))
+    state_correct = state_total = invalid_states = trace_exact = 0
+    x_step_correct = x_step_total = follows_trace = 0
+    for (body, gold), pred, trace in zip(examples, predictions, traces):
+        gold_states = gold_state_tokens(body, condition)
+        if not gold_states:
+            continue
+        matches = [written == expected for written, expected in zip(trace, gold_states)]
+        state_correct += sum(matches)
+        state_total += len(gold_states)
+        invalid_states += sum(written not in allowed_states for written in trace)
+        trace_exact += all(matches)
+        for index, char in enumerate(body):
+            if char == 'X':
+                x_step_correct += matches[index]
+                x_step_total += 1
+        follows_trace += pred == trace[-1]
+
     nonzero = [gold for gold in count_tokens if gold != '0']
     count = len(examples)
+    has_states = state_total > 0
     metrics = {
         'answer_loss': answer_loss,
         'acc_all': safe_divide(sum(c for c, _ in per_count.values()), count),
@@ -128,6 +180,14 @@ def split_metrics(examples, predictions, answer_loss):
         'under_rate': safe_divide(under, count),
         'over_rate': safe_divide(over, count),
         'invalid_rate': safe_divide(invalid, count),
+        'state_acc': safe_divide(state_correct, state_total),
+        'state_acc_at_x': safe_divide(x_step_correct, x_step_total),
+        'trace_exact_acc': safe_divide(trace_exact, count) if has_states else None,
+        'invalid_state_rate': safe_divide(invalid_states, state_total),
+        'answer_follows_trace': (
+            safe_divide(follows_trace, count)
+            if has_states and condition == 'meaningful' else None
+        ),
     }
     return metrics, confusion
 
@@ -151,6 +211,14 @@ def print_split(name, metrics, confusion, count):
         f"over-count {format_metric(metrics['over_rate'])} | "
         f"invalid {format_metric(metrics['invalid_rate'])}"
     )
+    if metrics['state_acc'] is not None:
+        print(
+            f"  written states: acc {format_metric(metrics['state_acc'])} | "
+            f"right after X {format_metric(metrics['state_acc_at_x'])} | "
+            f"whole trace {format_metric(metrics['trace_exact_acc'])} | "
+            f"invalid {format_metric(metrics['invalid_state_rate'])} | "
+            f"answer = last state {format_metric(metrics['answer_follows_trace'])}"
+        )
     columns = count_tokens + ['other']
     print("  confusion (rows = gold, columns = predicted):")
     print("          " + "".join(f"{column:>7}" for column in columns))
@@ -169,10 +237,14 @@ def confusion_string(confusion):
 val_examples = load_raw_examples(data_dir, 'val', meta)
 test_examples = load_raw_examples(data_dir, 'test', meta)
 
-val_predictions, val_loss = predict(val_examples)
-test_predictions, test_loss = predict(test_examples)
-val_metrics, val_confusion = split_metrics(val_examples, val_predictions, val_loss)
-test_metrics, test_confusion = split_metrics(test_examples, test_predictions, test_loss)
+val_predictions, val_traces, val_loss = predict(val_examples)
+test_predictions, test_traces, test_loss = predict(test_examples)
+val_metrics, val_confusion = split_metrics(
+    val_examples, val_predictions, val_traces, val_loss
+)
+test_metrics, test_confusion = split_metrics(
+    test_examples, test_predictions, test_traces, test_loss
+)
 
 print("=== Counting Evaluation ===")
 print(
@@ -218,21 +290,21 @@ if log_results:
 
     if log_predictions:
         prediction_rows = []
-        for split_name, examples, predictions in (
-            ('val', val_examples, val_predictions),
-            ('test', test_examples, test_predictions),
+        for split_name, examples, predictions, traces in (
+            ('val', val_examples, val_predictions, val_traces),
+            ('test', test_examples, test_predictions, test_traces),
         ):
-            for (body, gold), pred in zip(examples, predictions):
+            for (body, gold), pred, trace in zip(examples, predictions, traces):
                 positions = ' '.join(str(i) for i, char in enumerate(body) if char == 'X')
                 prediction_rows.append([
                     condition, pos_type, train_seed, meta['data_seed'],
                     checkpoint_iteration, split_name, body, positions, gold, pred,
-                    int(pred == gold),
+                    int(pred == gold), trace,
                 ])
         append_csv(
             predictions_csv,
             ['condition', 'pos_type', 'seed', 'data_seed', 'iteration', 'split',
-             'body', 'x_positions', 'gold', 'pred', 'correct'],
+             'body', 'x_positions', 'gold', 'pred', 'correct', 'pred_states'],
             prediction_rows,
         )
         print(f"\nlogged -> {results_csv} and {predictions_csv}")

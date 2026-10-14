@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Train and evaluate conditions x 5 seeds on the counting task.
 # Step 1 (default): NoPE, no scratchpad, length 20.
+# Scratchpad conditions at length 40 need BLOCK_SIZE >= 82 (2 * length + 2).
 set -euo pipefail
 
 RESULTS_CSV=${RESULTS_CSV:-results_step1_nope.csv}
@@ -9,6 +10,7 @@ POS_TYPE=${POS_TYPE:-none}
 RUN_PREFIX=${RUN_PREFIX:-out_step1_nope}
 CONDITIONS=${CONDITIONS:-no_scratchpad}
 DATA_DIR=${DATA_DIR:-data/count_scratchpad}
+BLOCK_SIZE=${BLOCK_SIZE:-64}
 
 if [[ -e "$RESULTS_CSV" || -e "$PREDICTIONS_CSV" ]]; then
   echo "Refusing to append to an existing result file. Set new RESULTS_CSV and PREDICTIONS_CSV paths."
@@ -20,7 +22,7 @@ for condition in $CONDITIONS; do
     run_dir="${RUN_PREFIX}_${condition}_${seed}"
     ../venv/bin/python train.py config/basic.py \
       --condition="$condition" --seed="$seed" --out_dir="$run_dir" \
-      --pos_type="$POS_TYPE" --data_dir="$DATA_DIR"
+      --pos_type="$POS_TYPE" --data_dir="$DATA_DIR" --block_size="$BLOCK_SIZE"
     for iteration in 500 1000 1500 2000; do
       checkpoint_name=$(printf 'ckpt_iter%04d.pt' "$iteration")
       log_predictions=False

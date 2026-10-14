@@ -1,4 +1,4 @@
-"""Unit tests for count labels and no-scratchpad loss masks."""
+"""Unit tests for count labels, scratchpad formats, and loss masks."""
 import unittest
 
 from scratchpad import (
@@ -6,6 +6,8 @@ from scratchpad import (
     build_supervised_example,
     check_condition,
     count_label,
+    gold_state_tokens,
+    running_counts,
 )
 
 
@@ -46,10 +48,67 @@ class SupervisionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_supervised_example('mpXaXdqXrbkzuwhnfeoc', '2', 'no_scratchpad', STOI)
 
-    def test_scratchpad_conditions_not_built_yet(self):
+    def test_unknown_condition_is_rejected(self):
+        with self.assertRaises(ValueError):
+            check_condition('scratch')
+
+
+class ScratchpadFormatTests(unittest.TestCase):
+    BODY = 'mpXaXdqXrbkzuwhnfeoc'
+
+    def test_running_counts_increment_at_each_x(self):
+        self.assertEqual(
+            ''.join(running_counts(self.BODY)), '00112223333333333333'
+        )
+        self.assertEqual(running_counts('abc'), ['0', '0', '0'])
+
+    def test_meaningful_record_matches_plan_format(self):
+        example = build_supervised_example(self.BODY, '3', 'meaningful', STOI)
+        self.assertTrue(example.record.startswith('0m0p0X1a1X2d2q2X3r3b3k3'))
+        self.assertTrue(example.record.endswith('c3:3'))
+        # Given '0', then (body token, state) pairs, then ':' and the answer.
+        self.assertEqual(len(example.record), 2 * len(self.BODY) + 3)
+
+    def test_dummy_record_matches_plan_format(self):
+        example = build_supervised_example(self.BODY, '3', 'dummy', STOI)
+        self.assertTrue(example.record.startswith('#m#p#X#a#X#'))
+        self.assertTrue(example.record.endswith('c#:3'))
+        self.assertEqual(len(example.record), 2 * len(self.BODY) + 3)
+
+    def test_state_and_answer_masks(self):
         for condition in ('dummy', 'meaningful'):
-            with self.assertRaises(NotImplementedError):
-                check_condition(condition)
+            example = build_supervised_example(self.BODY, '3', condition, STOI)
+            state_positions = [
+                index for index, target in enumerate(example.state_targets)
+                if target != IGNORE_INDEX
+            ]
+            # Each state is predicted from the body token just before it.
+            self.assertEqual(state_positions, list(range(1, 2 * len(self.BODY), 2)))
+            self.assertTrue(all(
+                ITOS[example.input_ids[index]] in FILLER + 'X' for index in state_positions
+            ))
+            predicted_states = [ITOS[example.state_targets[i]] for i in state_positions]
+            self.assertEqual(predicted_states, gold_state_tokens(self.BODY, condition))
+            answer_positions = [
+                index for index, target in enumerate(example.answer_targets)
+                if target != IGNORE_INDEX
+            ]
+            self.assertEqual(answer_positions, [len(example.input_ids) - 1])
+            self.assertEqual(ITOS[example.input_ids[-1]], ':')
+            self.assertEqual(ITOS[example.answer_targets[-1]], '3')
+            # The given leading token is never a target.
+            self.assertEqual(example.state_targets[0], IGNORE_INDEX)
+
+    def test_masks_are_disjoint(self):
+        example = build_supervised_example(self.BODY, '3', 'meaningful', STOI)
+        for state, answer in zip(example.state_targets, example.answer_targets):
+            self.assertFalse(state != IGNORE_INDEX and answer != IGNORE_INDEX)
+
+    def test_length_40_sequence_fits_block_96(self):
+        body = 'a' * 15 + 'X' + 'b' * 24
+        for condition in ('dummy', 'meaningful'):
+            example = build_supervised_example(body, '1', condition, STOI)
+            self.assertEqual(len(example.input_ids), 82)
 
 
 if __name__ == '__main__':

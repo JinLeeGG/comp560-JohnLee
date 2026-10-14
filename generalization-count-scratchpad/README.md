@@ -1,8 +1,8 @@
 # Counting Task with Scratchpad Tokens: Experiment Plan
 
-**Status:** Step 1 done ([log](log/2026-10-06-step1-nope-baseline.md)); waiting for
-Prof. MacCormick's decision on Step 2 vs Step 3  
-**Date:** October 6, 2026
+**Status:** Steps 1-4 done. Step 2 chose setting B (length 40, train 0-9, test 10-39);
+Steps 3 (NoPE) and 4 (RoPE) ran on it. Logs and figures for Steps 2-4 in progress  
+**Date:** October 6, 2026 (updated October 13, 2026)
 
 ## Summary
 
@@ -95,10 +95,34 @@ part of it during training:
 
 Try them in order and stop at the first one where the plain model fails.
 
+"Fails" was fixed before running: every seed 100% on seen positions, mean unseen
+accuracy (counts 1-3) at most about 70%, and at most one perfect seed.
+
+**Result (October 12, 2026; NoPE, no scratchpad, 5 seeds):**
+
+| Setting | Seen positions | Unseen, counts 1-3 | k=1 | k=2 | k=3 | Decision |
+|---|---:|---:|---:|---:|---:|---|
+| A | 100% | 94.69 +/- 4.61% | 84.1% | 100% | 100% | too easy |
+| B | 100% | 56.19 +/- 7.64% | 17.6% | 51.1% | 99.9% | **chosen** |
+
+In B, every seed misses a lone `X` from about position 16 onward. C was not needed.
+
 ### Step 3: Full comparison
 
-Train all three versions × 5 seeds on the chosen setting and compare their accuracy
-on the test positions.
+Train all three versions × 5 seeds on setting B and compare their accuracy on the
+test positions.
+
+Metrics, fixed before running Step 3:
+
+- **Main result:** unseen-position accuracy on counts 1-3 (as planned).
+- Reported next to it: counts 1 and 2 separately, because count 3 is near 100% even
+  without a scratchpad and lifts the average.
+- Count-1 accuracy by `X` position, to see whether the miss after about position 16
+  disappears.
+- Scratchpads: accuracy of the counts the model writes itself (all steps, and the step
+  right after each `X`).
+- Scratchpad sequences are 82 tokens, so Steps 3-4 use `block_size = 96`. NoPE and
+  RoPE have no parameters that depend on it.
 
 ### Step 4: Repeat with RoPE
 

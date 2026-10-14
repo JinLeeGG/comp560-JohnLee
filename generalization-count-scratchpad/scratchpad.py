@@ -4,15 +4,23 @@ The raw task is a fixed-length string of lowercase filler letters with k copies 
 X; the answer is k.  This module is independent of PyTorch so data loading,
 training, evaluation, and tests share one definition of each condition's format.
 
-Step 1 (baseline gate) implements only the no-scratchpad condition.  The dummy and
-meaningful formats from the plan are added in Step 3, after the gate.
+Formats (L = body length):
+
+    no_scratchpad  mpXaX...:2
+    dummy          #m#p#X#a#X#...#:2      '#' after every body token
+    meaningful     0m0p0X1a1X2...2:2      running count of X after every body token
+
+The leading '0' (or '#') is always the same, so it is given to the model rather than
+predicted.  State targets are the L tokens written after the body tokens; the answer
+target is the token after ':'.
 """
 from dataclasses import dataclass
 from typing import Dict, List
 
 
 CONDITIONS = ('no_scratchpad', 'dummy', 'meaningful')
-IMPLEMENTED_CONDITIONS = ('no_scratchpad',)
+DUMMY_STATE = '#'
+INITIAL_STATES = {'dummy': DUMMY_STATE, 'meaningful': '0'}
 IGNORE_INDEX = -1
 
 
@@ -41,10 +49,46 @@ def count_label(body: str) -> str:
 def check_condition(condition: str) -> None:
     if condition not in CONDITIONS:
         raise ValueError(f"unknown condition {condition!r}; expected one of {CONDITIONS}")
-    if condition not in IMPLEMENTED_CONDITIONS:
-        raise NotImplementedError(
-            f"condition {condition!r} is planned for Step 3 and not implemented yet"
-        )
+
+
+def running_counts(body: str) -> List[str]:
+    """Number of X symbols seen so far, after each body token."""
+    validate_body(body)
+    counts = []
+    count = 0
+    for token in body:
+        count += token == 'X'
+        counts.append(str(count))
+    return counts
+
+
+def initial_state_token(condition: str) -> str:
+    """The given (not predicted) token before the first body token."""
+    check_condition(condition)
+    if condition == 'no_scratchpad':
+        raise ValueError("the no-scratchpad condition has no scratchpad states")
+    return INITIAL_STATES[condition]
+
+
+def gold_state_tokens(body: str, condition: str) -> List[str]:
+    """Gold state after every body token (empty for the no-scratchpad condition)."""
+    check_condition(condition)
+    if condition == 'no_scratchpad':
+        validate_body(body)
+        return []
+    if condition == 'dummy':
+        validate_body(body)
+        return [DUMMY_STATE] * len(body)
+    return running_counts(body)
+
+
+def allowed_state_tokens(condition: str, count_tokens: List[str]) -> List[str]:
+    check_condition(condition)
+    if condition == 'meaningful':
+        return list(count_tokens)
+    if condition == 'dummy':
+        return [DUMMY_STATE]
+    return []
 
 
 def build_supervised_example(
@@ -63,8 +107,19 @@ def build_supervised_example(
         raise ValueError(f"wrong label {label!r} for {body!r}; expected {expected_label!r}")
     check_condition(condition)
 
-    tokens = list(body) + [':', label]
-    roles = ['raw'] * (len(body) + 1) + ['answer']
+    tokens: List[str] = []
+    roles: List[str] = []
+    if condition == 'no_scratchpad':
+        tokens.extend(body)
+        roles.extend(['raw'] * len(body))
+    else:
+        tokens.append(initial_state_token(condition))
+        roles.append('raw')
+        for raw_token, state_token in zip(body, gold_state_tokens(body, condition)):
+            tokens.extend((raw_token, state_token))
+            roles.extend(('raw', 'state'))
+    tokens.extend((':', label))
+    roles.extend(('raw', 'answer'))
 
     missing = [token for token in tokens if token not in stoi]
     if missing:
@@ -76,11 +131,16 @@ def build_supervised_example(
     answer_targets = [IGNORE_INDEX] * len(input_ids)
 
     for full_index in range(1, len(tokens)):
-        if roles[full_index] == 'answer':
+        if roles[full_index] == 'state':
+            state_targets[full_index - 1] = encoded[full_index]
+        elif roles[full_index] == 'answer':
             answer_targets[full_index - 1] = encoded[full_index]
 
     if sum(target != IGNORE_INDEX for target in answer_targets) != 1:
         raise AssertionError("every example must have exactly one answer target")
+    expected_state_count = 0 if condition == 'no_scratchpad' else len(body)
+    if sum(target != IGNORE_INDEX for target in state_targets) != expected_state_count:
+        raise AssertionError("unexpected number of scratchpad targets")
 
     return SupervisedExample(
         input_ids=input_ids,
