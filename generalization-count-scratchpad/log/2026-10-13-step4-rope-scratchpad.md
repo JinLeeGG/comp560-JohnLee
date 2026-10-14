@@ -154,8 +154,10 @@ In seeds 1337 and 1338, the second and third `+1` fail more often when the previ
 [Vector PDF](figures/step4_rope_meaningful_errors.pdf)
 
 *Figure 3. Wrong answers of the meaningful scratchpad on unseen inputs with 1-3 X
-(RoPE, seeds 1-5 = 1337-1341), split by where the model's own trace first goes wrong.
-Same categories as Step 3, Figure 3. In four of five seeds almost every error starts
+(RoPE, seeds 1-5 = 1337-1341), split by where the model's own trace first goes wrong:
+at an X it did not add 1 (it wrote the old count, except 219 cases where it wrote 1 at
+the third X), it wrote a lower count at a non-X position after the +1, or every count
+was right but the final answer was not. In four of five seeds almost every error starts
 with a missed +1 at an X; seed 1340 splits between a missed +1 and a dropped count. At
 NoPE, almost every error started with a dropped count.*
 
