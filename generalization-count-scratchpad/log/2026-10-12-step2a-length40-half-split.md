@@ -35,15 +35,19 @@ most one seed.
 - Main metric: unseen-position accuracy on counts 1-3 (count 0 has no `X` position and
   is reported separately).
 
-Example data (real examples from the generated pools):
+Example data (real examples from the generated pools). Each input is 40 lowercase
+letters with 0-3 `X`s, shown here in blocks of 10 positions; the `|` separates the
+positions where `X` appears in training from those where it appears only at test.
+The model reads the 40 letters and `:`, then writes the answer, e.g.
+`jnhydmmhpvrXhsybytgoirhiclgcwwhswdzyrgia:1`.
 
 ```text
-position:  0         1         2         3
-           0123456789012345678901234567890123456789
-train:     jnhydmmhpvrXhsybytgoirhiclgcwwhswdzyrgia:1    X at 11
-train:     lbmjcyikyldjqoXgXbmthoswdpwhybnmksqpjjhc:2    X at 14, 16
-test:      bmavevrmoqkuljfyiolkaweeXklqyvazvhkreinb:1    X at 24
-test:      hkwocygpllafrczgslopXpbXbqhvwgzjqymhyvbt:2    X at 20, 23
+         seen in training        |  unseen (test only)
+position 0-9         10-19       |  20-29       30-39       answer   X at
+train    jnhydmmhpv  rXhsybytgo  |  irhiclgcww  hswdzyrgia  1        11
+train    lbmjcyikyl  djqoXgXbmt  |  hoswdpwhyb  nmksqpjjhc  2        14, 16
+test     bmavevrmoq  kuljfyiolk  |  aweeXklqyv  azvhkreinb  1        24
+test     hkwocygpll  afrczgslop  |  XpbXbqhvwg  zjqymhyvbt  2        20, 23
 ```
 
 Commands:

@@ -193,9 +193,78 @@ def step2a_position_heatmap():
     save(fig, 'step2a_position_accuracy_heatmap')
 
 
+def step2b_position():
+    """Setting B (length 40, X seen in 0-9): same format as step2a_position."""
+    curves = load_five_seeds('predictions_step2B_nope.csv', 'no_scratchpad')
+    fig, ax = plt.subplots(figsize=(5.5, 2.0))
+    position_axes(ax, length=40, seen_end=10)
+    position_curve(ax, curves, 'no_scratchpad')
+    ax.set_xlabel('Position of the single X')
+    ax.set_ylabel('Accuracy (%)')
+    save(fig, 'step2b_position_accuracy')
+
+
+def final_rows(results_csv, condition='no_scratchpad'):
+    with open(os.path.join(HERE, results_csv)) as file:
+        rows = [row for row in csv.DictReader(file)
+                if row['iteration'] == ITERATION and row['condition'] == condition]
+    if len(rows) != 5:
+        raise ValueError(f'expected 5 seeds in {results_csv}, found {len(rows)}')
+    return sorted(rows, key=lambda row: int(row['seed']))
+
+
+def jitter(n, width=0.16):
+    # Fixed, evenly spread offsets so the five seed dots never depend on randomness.
+    return [width * (2 * i / (n - 1) - 1) for i in range(n)] if n > 1 else [0.0]
+
+
+def step2b_settings():
+    """Unseen-position accuracy by count for the three splits (no scratchpad, NoPE)."""
+    settings = [
+        # L = input length; second line = X positions seen in training.
+        ('results_step1_nope.csv', 'L=20\n0\u20139'),
+        ('results_step2A_nope.csv', 'L=40\n0\u201319'),
+        ('results_step2B_nope.csv', 'L=40\n0\u20139'),
+    ]
+    panels = [('acc_k1', '1 X'), ('acc_k2', '2 X'), ('acc_k3', '3 X'),
+              ('acc_k1plus', 'All (1-3 X)')]
+    color = CONDITION_COLORS['no_scratchpad']
+    data = {csv_name: final_rows(csv_name) for csv_name, _ in settings}
+
+    fig, axes = plt.subplots(1, 4, figsize=(5.5, 2.15), sharey=True)
+    for ax, (key, title) in zip(axes, panels):
+        for x, (csv_name, _) in enumerate(settings):
+            values = [100 * float(row[f'heldout_{key}']) for row in data[csv_name]]
+            mean = sum(values) / len(values)
+            ax.bar(x, mean, width=0.62, color=color, alpha=0.25, lw=0, zorder=2)
+            ax.hlines(mean, x - 0.31, x + 0.31, color=color, lw=1.4, zorder=3)
+            ax.scatter([x + dx for dx in jitter(len(values))], values, s=9, color=color,
+                       edgecolor='white', linewidth=0.4, zorder=4)
+        if key == 'acc_k1plus':
+            ax.axhline(70, color=MUTED, lw=0.8, ls=(0, (4, 3)), zorder=1)
+            ax.text(2.45, 72, 'pre-set bar', ha='right', va='bottom', fontsize=6.5,
+                    color=MUTED)
+        ax.set_title(title, fontsize=8, color=INK, pad=4)
+        ax.set_xticks(range(len(settings)))
+        ax.set_xticklabels([label for _, label in settings], fontsize=6.8)
+        ax.set_xlim(-0.6, len(settings) - 0.4)
+        ax.set_ylim(0, 105)
+        ax.set_yticks([0, 25, 50, 75, 100])
+        ax.grid(axis='y', color=GRID, lw=0.6, zorder=0)
+        ax.set_axisbelow(True)
+        ax.tick_params(axis='x', length=0)
+        for side in ('top', 'right'):
+            ax.spines[side].set_visible(False)
+    axes[0].set_ylabel('Unseen-position accuracy (%)')
+    fig.tight_layout(w_pad=0.6)
+    save(fig, 'step2b_settings_by_count')
+
+
 FIGURES = {
     'step2a_position': step2a_position,
     'step2a_position_heatmap': step2a_position_heatmap,
+    'step2b_position': step2b_position,
+    'step2b_settings': step2b_settings,
 }
 
 if __name__ == '__main__':
