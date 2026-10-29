@@ -1,5 +1,5 @@
 # Generalization Experiment: Relative-Order Task
-**Date:** June 20, 2026
+**Date:** June 20, 2026 (headline updated to the 10-seed run of July 13, 2026)
 
 This experiment trains a micro-transformer (<1M params) on a **relative-order** task
 and (later) measures whether it generalizes to symbol *position pairs* it never saw
@@ -49,41 +49,44 @@ the split rule on every example before writing the bins.
 
 ## Headline result — *relative* PE generalizes, *absolute* PE doesn't
 
-5-way PE sweep on the `half` split (held out the 2nd half), 4 seeds each. Every method reaches
-**100% in-distribution val** (all *learn* the task); they split sharply on the held-out test, and
-the split is exactly **relative vs absolute**:
+5-way PE sweep on the `half` split (held out the 2nd half), 10 seeds, each seed regenerating its
+own data split. Every method reaches **100% in-distribution val** (all *learn* the task); on the
+held-out test they split by **relative vs absolute**:
 
-| PE | family | held-out test |
-|----|--------|---------------|
-| `none` (NoPE) | relative (causal mask) | **≈100%** |
-| `rope` | relative | **≈100%** |
-| `t5` | relative | **100%** |
-| `learned` | absolute | **≈58%** (≈ chance) |
-| `sinusoidal` | absolute | **≈33%** (below chance) |
+| PE | family | held-out test (mean ± std, 10 seeds) | range |
+|----|--------|--------------------------------------|-------|
+| `none` (NoPE) | relative (causal mask) | **99.2 ± 1.7%** | 94.7–100 |
+| `t5` | relative | **99.2 ± 2.1%** | 92.9–100 |
+| `rope` | relative | **95.7 ± 6.8%** | 79.6–100 |
+| `learned` | absolute | **68.6 ± 18.1%** | 50–100 |
+| `sinusoidal` | absolute | **31.9 ± 6.9%** (below chance) | 19.2–42.7 |
 
 | `SPLIT` | result |
 |---------|--------|
 | `none` (full dist.) | all methods 100% |
 | `single_pos` (P=12) | trivial — 100% (one held-out slot generalizes for free) |
-| `half` (2nd half held out) | **relative ≈100% vs absolute ≤58%** (table above) |
+| `half` (2nd half held out) | **relative 96–99% vs absolute 32–69%** (10-seed means, table above) |
 
 The relative family expresses the answer through *relative* offsets (causal mask / rotation /
 relative bias), so a rule learned in the first half transfers to the second. The absolute family
-ties the computation to *absolute* slot identities seen in training, so off-distribution it
-misfires and collapses to one label. This **reverses the naive "PE helps" intuition** — here the
-*absolute-position representation* is exactly what breaks generalization.
+ties the computation to *absolute* slot identities seen in training: sinusoidal falls below chance
+in every seed, and learned depends on the seed (about 50% in some seeds, 90–100% in others). This
+**reverses the naive "PE helps" intuition** — here the *absolute-position representation* is
+exactly what breaks generalization.
 
 This reproduces — across a whole PE family — the NoPE-vs-absolute-PE finding of **Kazemnejad et
 al. (2023)**, *The Impact of Positional Encoding on Length Generalization in Transformers*
 (NeurIPS 2023), who report it for **length generalization** (longer sequences); here it appears in
 a **fixed-length, held-out-position** setting — the shift is over symbol *position* within a fixed
 length, not over length.
-See [log/2026-06-20-relative-order-pe-sweep.md](log/2026-06-20-relative-order-pe-sweep.md).
+See the [10-seed log](log/2026-07-13-relative-order-pe-sweep-10seed.md); the earlier
+[4-seed run](log/2026-06-20-relative-order-pe-sweep.md) used one fixed data split and understated
+the variance.
 
-<img src="log/figures/heldout_accuracy_half.png" alt="held-out accuracy by PE: none/rope/t5 ~100%, learned ~58%, sinusoidal ~33%; all val 100%" width="900">
+<img src="log/figures/heldout_bar_multiseed.png" alt="held-out accuracy over 10 seeds: relative near 100%, learned bimodal around chance, sinusoidal below chance; all val 100%" width="720">
 
-*(the per-position heatmap `log/figures/per_position_half.png` shows the mechanism — see the
-[held-out log](log/2026-06-20-relative-order-heldout-splits.md).)*
+*(the per-position heatmap `log/figures/per_position_multiseed.png` shows where each encoding
+fails — see the [10-seed log](log/2026-07-13-relative-order-pe-sweep-10seed.md).)*
 
 > **Why `none` solves even the full distribution** (verified — not a data leak): a causal
 > decoder is *not* permutation-invariant. The causal mask is itself an ordering signal, so
@@ -182,9 +185,10 @@ are gitignored; `results.csv` and `log/figures/*.png` are kept.
 | Date | Experiment | Status |
 |------|------------|--------|
 | 2026-06-20 | [Full-distribution baselines (none vs learned)](log/2026-06-20-relative-order-baselines.md) | ✅ both 100% (none surprising) |
-| 2026-06-20 | [Held-out positions — the phenomenon (none vs learned)](log/2026-06-20-relative-order-heldout-splits.md) | ✅ `half`: NoPE ≈100% vs learned ≈58% |
-| 2026-06-20 | [PE sweep — Phase 3 (all 5 encodings)](log/2026-06-20-relative-order-pe-sweep.md) | ✅ **relative (none/rope/t5) ≈100% vs absolute (learned 58% / sinusoidal 33%)** |
-| _next_ | Strengthen sweep (data reseed) · more splits · Phase 4 minimal model | — |
+| 2026-06-20 | [Held-out positions — the phenomenon (none vs learned)](log/2026-06-20-relative-order-heldout-splits.md) | ✅ `half`: NoPE ≈100% vs learned ≈58% (4 seeds) |
+| 2026-06-20 | [PE sweep — Phase 3 (all 5 encodings, 4 seeds)](log/2026-06-20-relative-order-pe-sweep.md) | ✅ relative (none/rope/t5) ≈100% vs absolute (learned 58% / sinusoidal 33%); superseded by the 10-seed run |
+| 2026-07-13 | [PE sweep — 10 seeds, data regenerated per seed](log/2026-07-13-relative-order-pe-sweep-10seed.md) | ✅ **relative 96–99% vs absolute 32–69%** (means); RoPE min 79.6, learned 50–100 |
+| _next_ | More splits · Phase 4 minimal model | — |
 
 To switch splits, edit `SPLIT` (and `HELDOUT_POS`) at the top of
 [data/order/prepare.py](data/order/prepare.py), regenerate, then train+eval as above.
@@ -198,9 +202,11 @@ dead ends) in the separate running/activity log.
 
 ## Next Steps
 - **Phase 3 — PE sweep: ✅ done.** All five PEs implemented and run on the `half` split;
-  relative (none/rope/t5) ≈100%, absolute (learned/sinusoidal) ≤58%. Hypothesis confirmed.
-- **Strengthen the seed sweep** — regenerate data per seed (current sweep varies only
-  model init / batch order on one fixed half split), report mean/variance.
+  with 10 seeds, relative 96–99% vs absolute 32–69% (means). The family split holds on average;
+  RoPE and learned vary by seed.
+- **Strengthen the seed sweep: ✅ done (2026-07-13).** 10 seeds, each regenerating its own data
+  split; mean ± std and per-seed values in the
+  [10-seed log](log/2026-07-13-relative-order-pe-sweep-10seed.md).
 - **More splits** — even/odd and distance-based hold-outs, to test whether the
   relative/absolute line holds across generalization axes.
 - **Phase 4 — minimal model** — shrink layers/heads, re-check the separation.
