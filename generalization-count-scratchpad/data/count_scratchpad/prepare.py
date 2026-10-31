@@ -9,9 +9,14 @@ Default (Step 1): length 20, seen 0..9, unseen 10..19.
 Longer variants change --length and --seen_end together for the whole setting;
 train and test inputs always have the same length.
 
+Step 5 adds the random-filler symbols to the vocabulary.  They never appear in the
+raw data (the strings are the same as without them), only in the given filler slots.
+
     ../venv/bin/python data/count_scratchpad/prepare.py
     ../venv/bin/python data/count_scratchpad/prepare.py --length=40 --seen_end=10 \
         --out_dir=data/count_scratchpad_L40_seen10
+    ../venv/bin/python data/count_scratchpad/prepare.py --length=40 --seen_end=10 \
+        --random_symbols='!$%&*+<=>?' --out_dir=data/count_scratchpad_L40_seen10_step5
 """
 import argparse
 import pickle
@@ -34,6 +39,8 @@ parser.add_argument('--n_train', type=int, default=50_000)
 parser.add_argument('--n_val', type=int, default=5_000)
 parser.add_argument('--n_test', type=int, default=2_000)
 parser.add_argument('--data_seed', type=int, default=1337)
+parser.add_argument('--random_symbols', default='',
+                    help='Step 5: extra vocabulary symbols for the random-filler version')
 parser.add_argument('--out_dir', type=Path, default=HERE)
 args = parser.parse_args()
 
@@ -51,8 +58,12 @@ if args.max_count > 9:
 FILLER = ''.join(char for char in string.ascii_lowercase if char != 'x')
 COUNT_TOKENS = ''.join(str(count) for count in COUNTS)
 DUMMY_TOKEN = '#'
+RANDOM_SYMBOLS = args.random_symbols
+taken = set(FILLER + 'X' + '0123456789' + DUMMY_TOKEN + ':\n')
+if len(set(RANDOM_SYMBOLS)) != len(RANDOM_SYMBOLS) or set(RANDOM_SYMBOLS) & taken:
+    raise ValueError(f"random symbols must be distinct and new: {RANDOM_SYMBOLS!r}")
 # One vocabulary for every condition so parameter counts match across conditions.
-VOCAB_CHARS = sorted(set(FILLER + 'X' + COUNT_TOKENS + DUMMY_TOKEN + ':\n'))
+VOCAB_CHARS = sorted(set(FILLER + 'X' + COUNT_TOKENS + DUMMY_TOKEN + ':\n' + RANDOM_SYMBOLS))
 STOI = {char: index for index, char in enumerate(VOCAB_CHARS)}
 ITOS = {index: char for char, index in STOI.items()}
 
@@ -150,7 +161,7 @@ with open(args.out_dir / 'meta.pkl', 'wb') as file:
         'filler': FILLER,
         'split': f'X seen in 0..{SEEN_END - 1}, unseen in {SEEN_END}..{LENGTH - 1}',
         'data_seed': args.data_seed,
-        'conditions': ('no_scratchpad', 'dummy', 'meaningful'),
+        'random_symbols': RANDOM_SYMBOLS,
     }, file)
 
 print(f"vocab_size={len(VOCAB_CHARS)} chars={''.join(VOCAB_CHARS)!r}")

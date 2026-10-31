@@ -3,7 +3,11 @@
 Without a scratchpad, the model reads the whole input and predicts the count in one
 forward pass.  With a scratchpad (dummy or meaningful), evaluation is free-running:
 the model writes its own state after every body token and keeps it in the context,
-then answers after ':'.  The primary metric is held-out accuracy on counts 1-3: an
+then answers after ':'.  The Step 5 '#' versions are free-running the same way: the
+model writes every '#' slot of its layout.  The given Step 5 versions (random symbols
+and their dummy_given reference) are given their filler tokens, so the whole input up
+to ':' is known and the answer comes from one forward pass, as without a scratchpad.
+The primary metric is held-out accuracy on counts 1-3: an
 input with no X has no X position, so count 0 is the same in both pools and is
 reported separately.
 """
@@ -16,11 +20,16 @@ from datetime import datetime
 import torch
 from torch.nn import functional as F
 
-from dataset import load_meta, load_raw_examples
+from dataset import load_meta, load_raw_examples, tensorize_examples
 from engine import MicroTransformer, MicroTransformerConfig
 from scratchpad import (
+    GIVEN_FILLER_CONDITIONS,
+    INITIAL_STATES,
+    WRITTEN_FILLER_CONDITIONS,
     allowed_state_tokens,
     check_condition,
+    draw_fillers,
+    filler_layout,
     gold_state_tokens,
     initial_state_token,
 )
@@ -82,11 +91,40 @@ model.eval()
 
 
 @torch.no_grad()
-def predict(examples):
+def write_filler_slots(batch):
+    """Feed the given tokens of a Step 5 layout and let the model write every '#' slot."""
+    layouts = [
+        filler_layout(body, condition, draw_fillers(condition, len(body), None, ''))
+        for body, _ in batch
+    ]
+    roles = layouts[0][1]
+    if roles[0] == 'state':
+        raise ValueError("the first token of a sequence must be given")
+    contexts = torch.empty((len(batch), 0), dtype=torch.long, device=device)
+    state_columns = []
+    for position, role in enumerate(roles):
+        if role == 'state':
+            next_ids = model(contexts)[:, -1, :].argmax(-1)
+            state_columns.append(next_ids)
+        else:
+            next_ids = torch.tensor(
+                [stoi[tokens[position]] for tokens, _ in layouts],
+                dtype=torch.long, device=device,
+            )
+        contexts = torch.cat((contexts, next_ids.unsqueeze(1)), dim=1)
+    return contexts, state_columns
+
+
+@torch.no_grad()
+def predict(examples, name):
     """Greedy answers, written state traces, and answer cross-entropy."""
     predictions = []
     traces = []
     loss_sum = 0.0
+    given_inputs = (
+        tensorize_examples(examples, condition, meta, name).inputs
+        if condition in GIVEN_FILLER_CONDITIONS else None
+    )
     for start in range(0, len(examples), inference_batch_size):
         batch = examples[start:start + inference_batch_size]
         if condition == 'no_scratchpad':
@@ -96,22 +134,29 @@ def predict(examples):
                 device=device,
             )
             traces.extend('' for _ in batch)
+        elif given_inputs is not None:
+            # The record up to ':' is the same one the model was trained on.
+            contexts = given_inputs[start:start + inference_batch_size].to(device)
+            traces.extend('' for _ in batch)
         else:
-            contexts = torch.full(
-                (len(batch), 1), stoi[initial_state_token(condition)],
-                dtype=torch.long, device=device,
-            )
-            state_columns = []
-            for index in range(meta['length']):
-                raw_ids = torch.tensor(
-                    [stoi[body[index]] for body, _ in batch],
-                    dtype=torch.long,
-                    device=device,
-                ).unsqueeze(1)
-                contexts = torch.cat((contexts, raw_ids), dim=1)
-                state_ids = model(contexts)[:, -1, :].argmax(-1)
-                state_columns.append(state_ids)
-                contexts = torch.cat((contexts, state_ids.unsqueeze(1)), dim=1)
+            if condition in WRITTEN_FILLER_CONDITIONS:
+                contexts, state_columns = write_filler_slots(batch)
+            else:
+                contexts = torch.full(
+                    (len(batch), 1), stoi[initial_state_token(condition)],
+                    dtype=torch.long, device=device,
+                )
+                state_columns = []
+                for index in range(meta['length']):
+                    raw_ids = torch.tensor(
+                        [stoi[body[index]] for body, _ in batch],
+                        dtype=torch.long,
+                        device=device,
+                    ).unsqueeze(1)
+                    contexts = torch.cat((contexts, raw_ids), dim=1)
+                    state_ids = model(contexts)[:, -1, :].argmax(-1)
+                    state_columns.append(state_ids)
+                    contexts = torch.cat((contexts, state_ids.unsqueeze(1)), dim=1)
             colon = torch.full((len(batch), 1), stoi[':'], dtype=torch.long, device=device)
             contexts = torch.cat((contexts, colon), dim=1)
             state_matrix = torch.stack(state_columns, dim=1).tolist()
@@ -160,10 +205,12 @@ def split_metrics(examples, predictions, traces, answer_loss):
         state_total += len(gold_states)
         invalid_states += sum(written not in allowed_states for written in trace)
         trace_exact += all(matches)
-        for index, char in enumerate(body):
-            if char == 'X':
-                x_step_correct += matches[index]
-                x_step_total += 1
+        # Only the dummy and meaningful layouts write one state per body token.
+        if condition in INITIAL_STATES:
+            for index, char in enumerate(body):
+                if char == 'X':
+                    x_step_correct += matches[index]
+                    x_step_total += 1
         follows_trace += pred == trace[-1]
 
     nonzero = [gold for gold in count_tokens if gold != '0']
@@ -237,8 +284,8 @@ def confusion_string(confusion):
 val_examples = load_raw_examples(data_dir, 'val', meta)
 test_examples = load_raw_examples(data_dir, 'test', meta)
 
-val_predictions, val_traces, val_loss = predict(val_examples)
-test_predictions, test_traces, test_loss = predict(test_examples)
+val_predictions, val_traces, val_loss = predict(val_examples, 'val')
+test_predictions, test_traces, test_loss = predict(test_examples, 'test')
 val_metrics, val_confusion = split_metrics(
     val_examples, val_predictions, val_traces, val_loss
 )

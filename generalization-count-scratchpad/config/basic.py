@@ -2,7 +2,7 @@
 
 out_dir = 'out'
 data_dir = 'data/count_scratchpad'
-condition = 'no_scratchpad'  # 'no_scratchpad' | 'dummy' | 'meaningful' (Step 3)
+condition = 'no_scratchpad'  # 'no_scratchpad' | 'dummy' | 'meaningful' (Step 3); Step 5 versions in scratchpad.py
 
 eval_interval = 250
 log_interval = 100

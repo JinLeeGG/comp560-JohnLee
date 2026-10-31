@@ -1,13 +1,14 @@
 """Load the shared raw data and build condition-specific teacher-forced tensors."""
 import os
 import pickle
+import random
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
 
-from scratchpad import build_supervised_example
+from scratchpad import FILLER_CONDITIONS, build_supervised_example, draw_fillers
 
 
 @dataclass
@@ -37,10 +38,27 @@ def load_raw_examples(data_dir: str, name: str, meta: Dict) -> List[Tuple[str, s
     return examples
 
 
-def tensorize_examples(examples, condition: str, meta: Dict) -> TensorSplit:
+def example_fillers(examples, condition: str, meta: Dict, name: str):
+    """Filler tokens per example (None outside Step 5).
+
+    Random symbols are drawn in file order from an RNG seeded by the data seed and the
+    split name, so every run and every evaluation sees the same symbols.
+    """
+    if condition not in FILLER_CONDITIONS:
+        return [None] * len(examples)
+    rng = random.Random(f"{meta['data_seed']}:{name}:{condition}")
+    return [
+        draw_fillers(condition, len(body), rng, meta.get('random_symbols', ''))
+        for body, _ in examples
+    ]
+
+
+def tensorize_examples(examples, condition: str, meta: Dict, name: str) -> TensorSplit:
     built = [
-        build_supervised_example(body, label, condition, meta['stoi'])
-        for body, label in examples
+        build_supervised_example(body, label, condition, meta['stoi'], fillers)
+        for (body, label), fillers in zip(
+            examples, example_fillers(examples, condition, meta, name)
+        )
     ]
     lengths = {len(example.input_ids) for example in built}
     if len(lengths) != 1:
@@ -59,4 +77,6 @@ def tensorize_examples(examples, condition: str, meta: Dict) -> TensorSplit:
 
 
 def load_tensor_split(data_dir: str, name: str, condition: str, meta: Dict) -> TensorSplit:
-    return tensorize_examples(load_raw_examples(data_dir, name, meta), condition, meta)
+    return tensorize_examples(
+        load_raw_examples(data_dir, name, meta), condition, meta, name
+    )
