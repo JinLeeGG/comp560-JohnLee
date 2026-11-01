@@ -60,6 +60,11 @@ unseen half had a single `X`. Details: [Step 1 log](log/2026-10-06-step1-nope-ba
 
 ### Step 5: Why the dummy helps (NoPE, setting B)
 
+![Step 5: unseen-position accuracy by number of X and version](log/figures/step5_nope_accuracy_by_count.png)
+
+*Unseen-position accuracy at 2,000 iterations. Bar and line: mean over five seeds (the
+number above each bar); dots: seeds. Versions are grouped by what they test.*
+
 | Version | Unseen, counts 1-3 | k=1 | k=2 | k=3 | vs no scratchpad |
 |---|---:|---:|---:|---:|---|
 | No scratchpad (rerun) | 53.33 +/- 10.15% | 15.2% | 48.2% | 96.6% | — |
@@ -375,6 +380,12 @@ Per seed, counts 1-3:
 | `#` every 4 | 86.67 | 100.00 | 100.00 | 90.20 | 100.00 |
 | Random filler | 57.53 | 64.00 | 72.73 | 53.47 | 57.40 |
 | Dummy, given | 71.47 | 64.60 | 58.13 | 64.13 | 60.73 |
+
+![Step 5: single-X accuracy by position for each version](log/figures/step5_nope_position_accuracy.png)
+
+*Accuracy on inputs with a single `X`, by the `X`'s position. Line: mean over five
+seeds; band: range across seeds; gray: positions seen in training (0-9). The versions
+being compared sit side by side.*
 
 Count-1 accuracy by `X` position (5 seeds pooled), and the first 5-position range
 under 50% in each seed (1337-1341):

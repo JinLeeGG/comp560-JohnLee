@@ -1,4 +1,4 @@
-"""Paper figures for the counting experiments (Steps 2-4).
+"""Paper figures for the counting experiments (Steps 2-5).
 
 Position curves follow the standard length-generalization format (Kazemnejad et al.
 2023, Fig. 3): one line per condition, a shaded band for seed variation, and a gray
@@ -27,16 +27,34 @@ OUT = os.path.join(HERE, 'log', 'figures')
 ITERATION = '2000'
 
 # Okabe-Ito, validated (light surface): CVD worst adjacent dE 11.0, normal 25.8.
+# Step 5 colors its versions by the question they test (where the '#' go, how many,
+# given with no loss); the five Step 5 hues pass too (worst adjacent CVD dE 15.8).
 CONDITION_COLORS = {
     'no_scratchpad': '#0072B2',
     'dummy': '#D55E00',
     'meaningful': '#009E73',
+    'pad_end': '#CC79A7',
+    'pad_start': '#CC79A7',
+    'every2': '#E69F00',
+    'every4': '#E69F00',
+    'dummy_given': '#56B4E9',
+    'random_filler': '#56B4E9',
 }
-CONDITION_MARKERS = {'no_scratchpad': 'o', 'dummy': 's', 'meaningful': '^'}
+CONDITION_MARKERS = {
+    'no_scratchpad': 'o', 'dummy': 's', 'meaningful': '^', 'pad_end': 'D',
+    'pad_start': 'D', 'every2': 'P', 'every4': 'P', 'dummy_given': 'o',
+    'random_filler': 'o',
+}
 CONDITION_LABELS = {
     'no_scratchpad': 'No scratchpad',
     'dummy': 'Dummy scratchpad',
     'meaningful': 'Meaningful scratchpad',
+    'pad_end': 'Pad at end',
+    'pad_start': 'Pad at start',
+    'every2': '# every 2',
+    'every4': '# every 4',
+    'dummy_given': 'Dummy, given',
+    'random_filler': 'Random filler',
 }
 INK = '#1A1A1A'
 MUTED = '#6B6B6B'
@@ -427,6 +445,83 @@ def step4_pe_comparison():
     save(fig, 'step4_nope_vs_rope_accuracy_by_count')
 
 
+STEP5_VERSIONS = ('no_scratchpad', 'dummy', 'pad_end', 'pad_start', 'every2', 'every4',
+                  'dummy_given', 'random_filler')
+STEP5_TICKS = {
+    'no_scratchpad': 'No\nscratchpad', 'dummy': 'Dummy', 'pad_end': 'Pad at\nend',
+    'pad_start': 'Pad at\nstart', 'every2': '# every 2', 'every4': '# every 4',
+    'dummy_given': 'Dummy,\ngiven', 'random_filler': 'Random\nfiller',
+}
+# (label, first version, last version + 1) in STEP5_VERSIONS order.
+STEP5_GROUPS = [('reference', 0, 2), ('where the # go', 2, 4), ('how many #', 4, 6),
+                ('given, no loss', 6, 8)]
+STEP5_PAIRS = [('no_scratchpad', 'dummy'), ('pad_end', 'pad_start'),
+               ('every2', 'every4'), ('dummy_given', 'random_filler')]
+
+
+def step5_csv(kind, condition):
+    """No scratchpad and dummy given come from the first (stopped) batch."""
+    batch = '' if condition in ('no_scratchpad', 'dummy_given') else 'b'
+    return f'{kind}_step5{batch}_nope.csv'
+
+
+def step5_main():
+    """Step 5: one row per count, one bar per version (mean), the five seeds as dots."""
+    data = {c: final_rows(step5_csv('results', c), c) for c in STEP5_VERSIONS}
+    fig, axes = plt.subplots(len(COUNT_PANELS), 1, figsize=(5.5, 5.2), sharex=True)
+    for row, (ax, (key, title)) in enumerate(zip(axes, COUNT_PANELS)):
+        for x, condition in enumerate(STEP5_VERSIONS):
+            color = CONDITION_COLORS[condition]
+            values = [100 * float(r[f'heldout_{key}']) for r in data[condition]]
+            mean = sum(values) / len(values)
+            ax.bar(x, mean, width=0.62, color=color, alpha=0.25, lw=0, zorder=2)
+            ax.hlines(mean, x - 0.31, x + 0.31, color=color, lw=1.4, zorder=3)
+            ax.scatter([x + dx for dx in jitter(len(values))], values, s=9, color=color,
+                       marker=CONDITION_MARKERS[condition], edgecolor='white',
+                       linewidth=0.4, zorder=4)
+            # Above the panel, so low bars and seed markers never cover it.
+            ax.text(x, 107, f'{mean:.0f}', ha='center', va='bottom', fontsize=7,
+                    color=INK, fontweight='bold', clip_on=False)
+        for _, start, _ in STEP5_GROUPS[1:]:
+            ax.axvline(start - 0.5, color=GRID, lw=0.8, zorder=1)
+        if row == 0:
+            for label, start, end in STEP5_GROUPS:
+                ax.text((start + end - 1) / 2, 124, label, ha='center', va='bottom',
+                        fontsize=7.5, color=MUTED, clip_on=False)
+        ax.set_ylabel(title, fontsize=8)
+        ax.set_xlim(-0.6, len(STEP5_VERSIONS) - 0.4)
+        ax.set_ylim(0, 105)
+        ax.set_yticks([0, 25, 50, 75, 100])
+        ax.grid(axis='y', color=GRID, lw=0.6, zorder=0)
+        ax.set_axisbelow(True)
+        ax.tick_params(axis='x', length=0)
+        for side in ('top', 'right'):
+            ax.spines[side].set_visible(False)
+    axes[-1].set_xticks(range(len(STEP5_VERSIONS)))
+    axes[-1].set_xticklabels([STEP5_TICKS[c] for c in STEP5_VERSIONS], fontsize=7.3)
+    fig.supylabel('Unseen-position accuracy (%)', fontsize=8.5, x=0.01)
+    fig.tight_layout(h_pad=1.4)
+    save(fig, 'step5_nope_accuracy_by_count')
+
+
+def step5_position():
+    """Step 5: single-X accuracy by position, one panel per version, compared pairs side by side."""
+    fig, axes = plt.subplots(len(STEP5_PAIRS), 2, figsize=(5.5, 4.8), sharex=True,
+                             sharey=True)
+    for row, pair in enumerate(STEP5_PAIRS):
+        for ax, condition in zip(axes[row], pair):
+            position_axes(ax, length=40, seen_end=10, label_regions=False)
+            curves = load_five_seeds(step5_csv('predictions', condition), condition)
+            position_curve(ax, curves, condition)
+            label = 'Dummy' if condition == 'dummy' else CONDITION_LABELS[condition]
+            ax.set_title(label, fontsize=8, color=INK, pad=3, loc='left')
+    for ax in axes[-1]:
+        ax.set_xlabel('Position of the single X')
+    fig.supylabel('Accuracy on single-X inputs (%)', fontsize=8.5, x=0.01)
+    fig.tight_layout(h_pad=0.6, w_pad=1.0)
+    save(fig, 'step5_nope_position_accuracy')
+
+
 FIGURES = {
     'step2a_position': step2a_position,
     'step2a_position_heatmap': step2a_position_heatmap,
@@ -439,6 +534,8 @@ FIGURES = {
     'step4_position': step4_position,
     'step4_errors': step4_errors,
     'step4_pe_comparison': step4_pe_comparison,
+    'step5_main': step5_main,
+    'step5_position': step5_position,
 }
 
 if __name__ == '__main__':
