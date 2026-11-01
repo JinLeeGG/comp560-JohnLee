@@ -76,18 +76,22 @@ number above each bar); dots: seeds. Versions are grouped by what they test.*
 | Random filler (given) | 61.03 +/- 7.56% | 23.7% | 67.3% | 92.0% | above (4/5) |
 | Dummy, given | 63.81 +/- 5.03% | 26.4% | 65.0% | 100% | above (5/5) |
 
-- The extra tokens alone do not explain the gain: every comparison fixed before running
-  came out against it. Pad at end (41 `#` after the input) does not help, pad at start
-  (41 `#` that cannot see the input) does, `#` every 4 beats every 2, and the random
-  filler is below dummy given.
-- Writing the `#` matters: the dummy beats dummy given in all 5 seeds.
+- More tokens alone do not explain the gain: none of the comparisons fixed before
+  running came out as that idea predicts. The clearest: pad at start (41 `#` that come
+  before the input and cannot see it) helps in all 5 seeds, while pad at end (41 `#`
+  after the input) does not. `#` every 4 beats every 2 and the dummy, so more `#` did
+  not help.
+- Training the model to write the `#` helps in the dummy layout: the dummy beats dummy
+  given (same sequence, `#` given with no loss) in all 5 seeds. This gap does not show
+  up for pad at end.
 - Pad at start counts a lone `X` at every unseen position in every seed, but in 3 of
   5 seeds it answers 2 on many count-3 inputs.
-- Not separated yet: every version that beats no scratchpad both moves the input
-  letters away from positions 0-39 and starts with a token that is not an input letter.
-  Pad at end does neither.
+- Not separated yet: every version that beats no scratchpad puts the input letters at
+  new sequence positions and starts with a token that is not an input letter. Pad at
+  end does neither.
 
 Details: [Step 5](#step-5-why-does-the-dummy-scratchpad-help-nope).
+[Step 5 log](log/2026-10-30-step5-why-dummy-helps.md)
 
 ## The task
 
@@ -349,8 +353,9 @@ DATA_DIR=data/count_scratchpad_L40_seen10_step5 BLOCK_SIZE=96 POS_TYPE=none \
 
 **Result (October 30, 2026; NoPE, setting B, 5 seeds).** All runs were 100% on seen
 positions, and the versions that write `#` wrote it correctly at least 99.97% of the
-time on unseen positions, in every run. The dummy rerun is 82.68%, close to Step 3 (83.67%), so the
-new vocabulary does not matter. Files: `results_step5b_nope.csv`,
+time on unseen positions, in every run. The reruns are close to Step 3 (dummy 82.68% vs
+83.67%; no scratchpad 53.33% vs 56.19%), so the new vocabulary changes little. Files:
+`results_step5b_nope.csv`,
 `predictions_step5b_nope.csv` (no scratchpad and dummy given are in the first-batch
 files).
 
@@ -415,24 +420,29 @@ What the result shows:
   35-39 comes from the `:`.
 - **Pad at start fails in a different way.** Counts 1 and 2 are 100% in every seed and
   at every position, but count 3 is 34.6%, 15.0%, and 34.2% in seeds 1337, 1339, and
-  1340 (100% in 1338 and 1341). Every wrong count-3 answer is 2, and it gets worse the
-  later the last `X` is (last `X` in 20-24: 94%; 25-29: 71%; 30-34: 52%; 35-39: 42%).
+  1340 (100% in 1338 and 1341). Every wrong count-3 answer is 2, and in those three
+  seeds it gets worse the later the last `X` is (last `X` in 20-24: 90%; 25-29: 51%;
+  30-34: 20%; 35-39: 4%). Without a scratchpad, count 3 is 96.6%.
 - **`#` every 4 is the best version** (95.37%, three perfect seeds) and the only one
   above the dummy.
 - **The random filler is the only version that answers above the true count** (189
   count-2 inputs answered 3).
-- **Writing the `#` matters.** The dummy is above dummy given in all 5 seeds (82.68%
-  vs 63.81%). At test time both see the same sequence (the written `#` are right), so
-  the difference comes from training on the `#` targets.
+- **Training on the `#` helps in the dummy layout.** The dummy is above dummy given in
+  all 5 seeds (82.68% vs 63.81%). At test time both see the same sequence (the written
+  `#` are right), so the difference comes from training on the `#` targets. Pad at end
+  does not show this gap: its given version from the first batch (4 seeds) has a higher
+  mean than the written one (62.78% vs 56.91%; one `X`: 32.3% vs 6.9%).
 
 Not separated by this experiment: every version that beats no scratchpad changes two
-things at once. The input letters move away from positions 0-39, and the sequence
-starts with a token that is not an input letter (`#`, or a random symbol). Pad at end
-changes neither: its input letters sit at 0-39, as without a scratchpad, and its first
-token is an input letter. So pad at start and pad at end differ in both, and either
-could be the cause. A check that separates them (not run): no scratchpad with one
-leading `#` (42 tokens, 5 seeds), which adds the leading token but moves the input by
-only one position.
+things at once. The input letters sit at different sequence positions than without a
+scratchpad, and the sequence starts with a token that is not an input letter (`#`, or
+a random symbol). Pad at end changes neither: its input letters sit at sequence
+positions 0-39, as without a scratchpad, and its first token is an input letter. So pad
+at start and pad at end differ in both, and either could be the cause. How far the
+letters move does not order the results: `#` every 4 moves them least (by 1-10
+positions) and is the best version. A check that separates the two (not run): no
+scratchpad with one leading `#` (42 tokens, 5 seeds), which adds the leading token but
+moves the input by only one position.
 
 Each step ends with a report before the next one starts.
 
