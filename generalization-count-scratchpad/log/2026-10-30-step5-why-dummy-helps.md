@@ -123,7 +123,7 @@ setting B). The first row is the main metric (counts 1-3); the others break it d
 number of X. Bars and thick lines: mean over five seeds (value above each bar);
 markers: individual seeds. Versions are grouped by what they test. What to look at: pad
 at start is 100% on one and two X but drops on three X; pad at end is lowest on one X;
-# every 4 is highest overall; the two given versions are below the dummy.*
+`#` every 4 is highest overall; the two given versions are below the dummy.*
 
 Final checkpoint (2,000 iterations), unseen positions, mean over five seeds:
 
@@ -226,7 +226,7 @@ band: range across seeds; gray: positions seen in training. The versions being c
 sit side by side. In most versions each seed drops from about 100% to about 0% within a
 few positions, each at its own position, so the mean falls in steps. What to look at:
 pad at start stays at 100% everywhere; pad at end drops at position 12-13 in every seed
-(no scratchpad: 13-19); # every 4 keeps the highest mean among the versions that drop.*
+(no scratchpad: 13-19); `#` every 4 keeps the highest mean among the versions that drop.*
 
 First unseen position where single-`X` accuracy falls below 50%:
 
