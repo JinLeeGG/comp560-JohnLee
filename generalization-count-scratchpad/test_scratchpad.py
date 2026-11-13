@@ -234,5 +234,36 @@ class Step5FormatTests(unittest.TestCase):
             draw_fillers('random_filler', 40, random.Random(0), '')
 
 
+class SingleTokenFormatTests(unittest.TestCase):
+    BODY = 'a' * 15 + 'X' + 'b' * 16 + 'X' + 'c' * 7
+
+    def test_single_marker_position_and_raw_body(self):
+        self.assertEqual(len(self.BODY), 40)
+        prefix = step5_example(self.BODY, '2', 'prefix_one')
+        suffix = step5_example(self.BODY, '2', 'suffix_one')
+        self.assertEqual(prefix.record, '#' + self.BODY + ':2')
+        self.assertEqual(suffix.record, self.BODY + '#:2')
+        self.assertEqual(prefix.record.count('#'), 1)
+        self.assertEqual(suffix.record.count('#'), 1)
+        self.assertEqual(prefix.record[1:41], self.BODY)
+        self.assertEqual(suffix.record[:40], self.BODY)
+
+    def test_answer_only_loss_and_matched_answer_position(self):
+        for condition in ('prefix_one', 'suffix_one'):
+            example = step5_example(self.BODY, '2', condition)
+            self.assertEqual(len(example.input_ids), 42)
+            self.assertTrue(all(t == IGNORE_INDEX for t in example.state_targets))
+            self.assertEqual(gold_state_tokens(self.BODY, condition), [])
+            targets = [i for i, t in enumerate(example.answer_targets) if t != IGNORE_INDEX]
+            self.assertEqual(targets, [41])
+            self.assertEqual(STEP5_ITOS[example.input_ids[41]], ':')
+            self.assertEqual(STEP5_ITOS[example.answer_targets[41]], '2')
+
+    def test_one_given_marker_at_both_raw_lengths(self):
+        for length in (20, 40):
+            for condition in ('prefix_one', 'suffix_one'):
+                self.assertEqual(draw_fillers(condition, length, None, ''), ['#'])
+
+
 if __name__ == '__main__':
     unittest.main()

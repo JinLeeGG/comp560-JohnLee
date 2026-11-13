@@ -1,16 +1,23 @@
-# Counting Task with Scratchpad Tokens: Experiment Plan
+# Counting Task with Scratchpad Tokens: Plan and Results
 
-**Status:** Steps 1-5 done (logs below). Step 2 chose setting B (length 40, `X` seen in
+**Status:** Steps 1-7 done, including single-token placement and frozen-model
+running-count probes.
+Step 2 chose setting B (length 40, `X` seen in
 positions 0-9, tested on 10-39); Steps 3 (NoPE) and 4 (RoPE) ran on it, and Step 5
 tested why the dummy scratchpad helps with NoPE  
-**Date:** October 6, 2026 (updated October 30, 2026)
+**Date:** October 6, 2026 (updated November 8, 2026)
+
+[Numerical and interpretation audit](log/2026-11-08-results-audit.md): all Step 6
+final predictions and all Step 7 probe/position/diagnostic scores were reproduced
+from saved models/readouts; earlier counting-result tables were independently checked.
 
 ## Summary
 
-The model reads a 20-character string and answers **how many `X`s it contains**
-(0 to 3). During training, `X`s appear only in the first half of the string. At test
-time, they appear only in the second half, at positions the model has never seen an
-`X` in.
+The model answers **how many `X`s a string contains** (0 to 3). The initial Step 1
+setting uses 20 characters, with training X positions 0-9 and test positions 10-19.
+The current setting B, used in Steps 3-7, uses 40 characters, with training X
+positions 0-9 and test positions 10-39. Within each experiment, training and test
+raw lengths are identical; the distribution shift concerns X positions.
 
 We first check whether a plain model (no scratchpad) can already do this. If it
 fails, we test whether a **scratchpad**, where the model writes a running count as it
@@ -33,6 +40,10 @@ All five seeds were 100% on seen positions. On unseen positions, the mean was 89
 for counts 1-3: two seeds were perfect, and almost every error answered 0 when the
 unseen half had a single `X`. Details: [Step 1 log](log/2026-10-06-step1-nope-baseline.md).
 
+There was some headroom at length 20. Step 2 nevertheless followed the advisor's
+preference for a clearer baseline failure and introduced a separate hard-setting
+selection gate (unseen mean at most about 70%).
+
 ### Step 2: Making the task harder
 
 - Setting A (length 40, `X` seen in 0-19, tested on 20-39): 94.7% on unseen positions,
@@ -48,13 +59,13 @@ unseen half had a single `X`. Details: [Step 1 log](log/2026-10-06-step1-nope-ba
 | | No scratchpad | Dummy | Meaningful |
 |---|---:|---:|---:|
 | NoPE (Step 3) | 56.2% | 83.7% | 91.1% |
-| RoPE (Step 4) | 12.4% | 11.7% | 47.9% |
+| RoPE (Step 4) | 12.35% | 11.72% | 47.85% |
 
 - **NoPE:** the meaningful scratchpad is best, and three of five seeds count a lone `X`
   at every unseen position. The dummy scratchpad also helps a lot; Step 5 tests why.
   Remaining errors: the model writes the `+1`, then drops the count.
   [Step 3 log](log/2026-10-12-step3-nope-scratchpad.md)
-- **RoPE:** fails without a scratchpad (12.4%); the dummy does not help; the meaningful
+- **RoPE:** fails without a scratchpad (12.35%); the dummy does not improve the mean; the meaningful
   scratchpad helps in every seed but stays far from 100%, mostly because the model
   does not add 1 at an unseen `X`. [Step 4 log](log/2026-10-13-step4-rope-scratchpad.md)
 
@@ -86,14 +97,125 @@ number above each bar); dots: seeds. Versions are grouped by what they test.*
   up for pad at end.
 - Pad at start counts a lone `X` at every unseen position in every seed, but in 3 of
   5 seeds it answers 2 on many count-3 inputs.
-- Not separated yet: every version that beats no scratchpad puts the input letters at
+- At Step 5, not separated yet: every version that beats no scratchpad puts the input letters at
   new sequence positions and starts with a token that is not an input letter. Pad at
   end does neither.
 
 Details: [Step 5](#step-5-why-does-the-dummy-scratchpad-help-nope).
 [Step 5 log](log/2026-10-30-step5-why-dummy-helps.md)
 
+### Step 6: One supplied token before or after the input
+
+The next comparison asks whether one supplied `#` is enough to change position
+generalization, with its placement as the only difference between the new formats:
+
+| Condition | Record | Model input length | Objective |
+|---|---|---:|---|
+| Existing Step 5 baseline | `body:count` | 41 | final answer only |
+| `prefix_one` | `#body:count` | 42 | final answer only |
+| `suffix_one` | `body#:count` | 42 | final answer only |
+
+Both new markers are supplied, not generated. Raw bodies remain length 40. Data,
+43-token vocabulary, NoPE model, 2,000-iteration budget, and model seeds 1337-1341
+match Step 5. The fixed final checkpoint is the primary comparison; counts 1-3 are
+the main metric, with count 0, each count, and single-X positions also reported.
+
+The prefix also shifts raw-token sequence positions by one, so this comparison cannot
+by itself identify an attention sink or a unique internal mechanism. It tests whether
+a small format change can reproduce an improvement without a long scratchpad or
+an auxiliary state-prediction objective.
+
+The pre-run plan and data audit are in the
+[Step 6 plan](log/2026-11-08-step6-single-token-plan.md). Run with
+`bash run_step6.sh`. New results are written to `results_step6_nope.csv` and
+`predictions_step6_nope.csv`; the existing Step 5 baseline is retained.
+
+**Result (November 8, 2026):** All new models reached 100% seen-position accuracy.
+At the fixed 2,000-iteration checkpoint:
+
+| Condition | Unseen counts 1-3, mean +/- sample SD | Higher than baseline |
+|---|---:|---:|
+| No scratchpad (Step 5 reference) | 53.33 +/- 10.15% | — |
+| One supplied `#` before input | 64.16 +/- 10.60% | 3/5 seeds |
+| One supplied `#` after input | 74.13 +/- 22.61% | 4/5 seeds |
+
+![Final-answer accuracy with no extra token, one token before input, or one token after input](log/figures/step6_single_token_main.png)
+
+*Final-answer accuracy on unseen X positions, counts 1-3. Thin lines connect the
+same initialization seed across separately trained formats; points are the five
+model seeds, and black bars are means. All raw inputs have length 40. The supplied
+suffix improves the mean, with substantial variation between seeds.*
+
+[Vector PDF](log/figures/step6_single_token_main.pdf) ·
+[Supporting figures: counts and X positions](log/2026-11-08-step6-single-token-results.md#supporting-figures)
+
+The strongest result is that a single supplied **suffix** can improve transfer without
+changing raw-token sequence positions, adding a leading marker, or training the model
+to predict fillers. The suffix leaves the body at positions 0-39; its mean improvement
+over baseline is 20.80 percentage points, although one seed worsens. The earlier
+Step 5 observation that all improving layouts also moved the raw inputs and added a
+leading nonletter therefore does not hold across this new comparison. The result
+does not identify hidden computation or any unique mechanism. The suffix also moves
+the delimiter/answer query by one position, and both versions remain seed-sensitive.
+
+See the [complete Step 6 log](log/2026-11-08-step6-single-token-results.md) for individual
+seeds, checkpoint trajectories, the position plot, and verification details.
+
+### Step 7: Can a hidden vector reveal the running count?
+
+The existing Step 5 models were frozen. Separate linear classifiers were fitted to
+read counts 0-3 from a non-X raw-character vector or the following `#` vector. New
+40-character probe pools balance all counts at every query position, match the
+current letter across counts, and exclude the original data. Probe fitting uses
+queries 3-9; unseen evaluation uses 13-39. This tests position generalization at
+fixed raw length, rather than length generalization.
+
+For the dummy model trained to predict `#`, final-layer readouts at `#` gave:
+
+| Readout | Accuracy, mean +/- sample SD |
+|---|---:|
+| Trained model, seen queries | 88.15 +/- 2.77% |
+| Trained model, unseen queries | 47.84 +/- 5.71% |
+| Random model, unseen queries | 42.65 +/- 1.55% |
+| Trained model, shuffled probe-fit labels, unseen queries | 27.96 +/- 10.05% |
+
+Chance is 25%. The trained model exceeds its random counterpart by 5.19 percentage
+points on average at unseen `#` sites, but one seed's difference is only 0.029 points.
+Raw-character vectors also contain count-related information, and the trained
+dummy-given `#` readout does not exceed its random control on average.
+The dummy's unseen per-count recall is 100.0 / 50.9 / 32.2 / 8.3% for counts 0-3,
+so its overall probe score should not be read as reliable recovery of every count.
+
+![Count decoded from dummy-token hidden states: trained and untrained models, transfer and count-specific results](log/figures/step7_hidden_count_main.png)
+
+*Count decoding from the hidden vector at `#` in the full interleaved dummy format,
+after block 4. This measures available internal information, rather than the final
+answer evaluated in Step 6. Both trained and untrained transformers stay frozen;
+each has a linear classifier fitted on seen queries. Left: transfer to unseen
+queries. Right: recall within each unseen count, including the strong count-0
+result. Points are the five seeds; thin lines pair trained and untrained models
+with the same initialization seed within each group, and black bars are means.*
+
+[Vector PDF](log/figures/step7_hidden_count_main.pdf) ·
+[Supporting figures: all sites, shuffled labels, layers, and positions](log/2026-11-08-step7-hidden-count-probes.md#supporting-figures)
+
+A constant visible token can therefore have a context-dependent hidden vector from
+which count is partly recoverable. However, substantial random-model decoding and
+the seen-to-unseen drop limit the conclusion: this does not prove that the model
+uses an invariant running count, or that this representation causes the original
+accuracy improvement. The synthetic probe pools also differ from the original task
+distribution; their final-answer diagnostics are reported separately.
+
+See the [Step 7 plan](log/2026-11-08-step7-probe-plan.md) and
+[complete results log](log/2026-11-08-step7-hidden-count-probes.md) for all measurement
+sites, layers, query positions, controls, and reproducibility details. Numerical
+outputs are in `results_step7_{probes,positions,diagnostics,summary}.csv`.
+
 ## The task
+
+The following short example illustrates the initial Step 1 setting (length 20).
+The current setting B keeps the same counting rule but uses length 40, with X
+positions 0-9 for training and 10-39 for testing.
 
 ```text
 position:   0000000000 1111111111
@@ -105,22 +227,23 @@ test:       kzuwhnfeoc mpXaXdqXrb :3    X only in positions 10-19
 
 *(The space between the halves is only for readability.)*
 
-- Every input is exactly **20 characters**. Only the position of the `X`s changes
-  between training and test, not the length.
+- Every input in this initial example is exactly **20 characters**; inputs in
+  setting B are exactly **40 characters**. Raw length stays fixed within each
+  training/test comparison.
 - The other characters are random lowercase letters. Digits are not used as filler
   because digits are now the answers.
 - The answer is **0, 1, 2, or 3**, each 25% of the data.
 
 ## Three versions of the model
 
-All three use the same model, the same data, and the same seeds. The only difference
-is what the model writes before the answer. The model uses NoPE (no positional
-encoding) first, and RoPE in Step 4.
+All three use the same architecture, raw data, and model seeds within each
+comparison. Their token layouts and intermediate prediction targets differ. The
+model uses NoPE (no explicit positional encoding) first, and RoPE in Step 4.
 
 | Version | What the model writes | Example |
 |---|---|---|
 | **No scratchpad** | Only the answer | `mpXaXdqXrbkzuwhnfeoc:3` |
-| **Dummy scratchpad** | A meaningless `#` after every character | `#m#p#X#a#X#d#q#X#r#b#k#…#:3` |
+| **Dummy scratchpad** | The constant symbol `#` after every character | `#m#p#X#a#X#d#q#X#r#b#k#…#:3` |
 | **Meaningful scratchpad** | The number of `X`s seen so far | `0m0p0X1a1X2d2q2X3r3b3k3…3:3` |
 
 How the meaningful scratchpad works:
@@ -130,11 +253,13 @@ input:    m  p  X  a  X  d  q  X  r  b  ...
 count:  0  0  0  1  1  2  2  2  3  3  3 ...   (+1 at every X)
 ```
 
-The dummy version makes the sequence the same length as the meaningful one. If only
-the meaningful version succeeds, the benefit comes from the counts themselves, not
-from the longer sequence.
+The dummy version matches the meaningful version's sequence length. If meaningful
+outperforms dummy, explicit running-count targets help relative to this control.
+The comparison also changes intermediate supervision and generated history, so it
+does not by itself identify the complete mechanism. A constant visible `#` carries
+no explicit count label; its hidden vector can still depend on the preceding input.
 
-## Plan
+## Original experiment sequence (Steps 1-5)
 
 ### Step 1: Can the plain model already do it?
 
@@ -202,7 +327,7 @@ was meant as a control, but with NoPE it raised count-1 accuracy from 17.6% to 5
 and count-2 accuracy from 51.1% to 92.9%, as high as the meaningful scratchpad on
 count 2.
 
-- **Question:** why does a scratchpad that carries no information help?
+- **Question:** why does a scratchpad with no explicit count labels help?
 - **Hypothesis:** the dummy doubles the number of tokens. More tokens may give the
   model more room to compute and store intermediate results, with the same number of
   parameters.
@@ -279,15 +404,16 @@ dummy given becomes the reference for the random filler. Files:
 - **Same input strings as Step 3.** The token ids change with the new vocabulary, so
   the data files are rebuilt with data seed 1337 and checked against the Step 3
   strings.
-- **Random symbols are new symbols, not letters or digits.** NoPE has no position
-  signal to tell an input letter from a filler letter, and digits are the counts and
-  answers. A symbol is drawn for every slot of every example with the data seed, so
-  every run sees the same symbols.
+- **Random symbols are new symbols, not letters or digits.** Distinct symbols make
+  input letters and filler tokens distinguishable by identity; digits are reserved
+  for counts and answers. NoPE has no explicit positional encoding, although causal
+  context can supply implicit positional information. Symbols are drawn for every
+  slot using the data seed, so every run sees the same symbols.
 - **The pad versions use 41 `#`, the same as the dummy.** The sequence stays 82 tokens
   (`block_size = 96`), and only the place of the `#`s changes.
 - **Every 2 and every 4, not every 3:** 40 divides evenly, and the number of `#`
   halves each time (41, 21, 11).
-- **NoPE only.** With RoPE the dummy did not help (12.4% vs 11.7%), so the effect is
+- **NoPE only.** With RoPE the dummy did not improve the mean (12.35% vs 11.72%), so the effect is
   explained with NoPE first.
 
 **Predictions, fixed before running.** The meeting guessed that random tokens and
@@ -295,7 +421,8 @@ fewer slots would still beat no scratchpad, and left the placement test open (it
 help or not). The table below is what the hypothesis implies, not a guess from the
 meeting. Main metric as in Step 3 (unseen positions, counts 1-3). "Above" means higher
 in at least 4 of 5 seeds, paired by seed; "about equal" means neither is higher in 4 of
-5 seeds. The references are the Step 5 reruns (dummy given for the random filler).
+5 seeds. These labels are descriptive, not tests of significance or statistical
+equivalence. The references are the Step 5 reruns (dummy given for the random filler).
 
 | Version | If the extra tokens add computation | Against it |
 |---|---|---|
@@ -433,16 +560,17 @@ What the result shows:
   does not show this gap: its given version from the first batch (4 seeds) has a higher
   mean than the written one (62.78% vs 56.91%; one `X`: 32.3% vs 6.9%).
 
-Not separated by this experiment: every version that beats no scratchpad changes two
+At Step 5, not separated by that experiment: every version that beats no scratchpad changes two
 things at once. The input letters sit at different sequence positions than without a
 scratchpad, and the sequence starts with a token that is not an input letter (`#`, or
 a random symbol). Pad at end changes neither: its input letters sit at sequence
 positions 0-39, as without a scratchpad, and its first token is an input letter. So pad
 at start and pad at end differ in both, and either could be the cause. How far the
 letters move does not order the results: `#` every 4 moves them least (by 1-10
-positions) and is the best version. A check that separates the two (not run): no
-scratchpad with one leading `#` (42 tokens, 5 seeds), which adds the leading token but
-moves the input by only one position.
+positions) and is the best version. Step 6 subsequently tested one leading `#`
+and one trailing `#` (42 tokens, 5 seeds each). The trailing token improved the
+mean without moving the raw input or adding a leading nonletter; see the
+[Step 6 results](#step-6-one-supplied-token-before-or-after-the-input).
 
 Each step ends with a report before the next one starts.
 
@@ -451,15 +579,15 @@ Each step ends with a report before the next one starts.
 | What we see | What it means |
 |---|---|
 | No scratchpad already gets about 100% | Too easy; we cannot measure a scratchpad effect |
-| Meaningful beats both dummy and no scratchpad | Writing the running count helps the model generalize |
-| Meaningful and dummy are similar, both beat no scratchpad | The longer sequence, not the counts, may be what helps |
+| Meaningful beats both dummy and no scratchpad | Explicit running-count supervision and history help relative to these controls |
+| Meaningful and dummy are similar, both beat no scratchpad | Explicit count tokens are not required; layout, extra tokens, or auxiliary training may help |
 | Every version fails even on training positions | Training is broken; fix it before reading the test results |
 
 ## Details
 
 ### Where the design comes from
 
-| From the October 2 meeting note | Chosen to match earlier experiments |
+| From the October 2 meeting note | Initial choices matching earlier experiments |
 |---|---|
 | Counting task, filler letters | Input length 20 |
 | Count range "0-9 or 0-3" | Train on positions 0-9, test on 10-19 |
@@ -468,9 +596,10 @@ Each step ends with a report before the next one starts.
 
 ### Special cases
 
-- **Count 0:** an input with no `X` has no `X` position, so it is the same in training
-  and test. It is kept in the data, but the main test score uses counts 1-3 only, and
-  count 0 is reported separately.
+- **Count 0:** there is no X position to shift, so its class-conditional sampling
+  distribution is unchanged across splits. The examples themselves are separate.
+  It is kept in the data, but the main test score uses counts 1-3 only, and count 0
+  is reported separately.
 - **Dummy token:** `#` replaces the `z` used in the distance experiment, because `z` is
   now a filler letter.
 - **Starting `0` (or `#`):** always the same, so it is given to the model rather than
@@ -486,8 +615,9 @@ Same as the distance scratchpad experiment:
 - Model seeds 1337-1341; data seed 1337.
 - Loss only on what the model must write (counts or `#`, and the answer), not on the
   input characters.
-- At test time, the model writes each count itself and keeps it in the context, the
-  same way it is used in practice.
+- In meaningful/dummy and other written-state conditions, the model generates its
+  states at test time and keeps them in context. Given-filler conditions supply
+  their filler tokens and use answer-only loss.
 
 ### What we measure
 
@@ -497,7 +627,7 @@ Same as the distance scratchpad experiment:
 - For scratchpads: how often each written count is correct, especially right after
   an `X`.
 
-### Files (planned)
+### Original experiment layout
 
 ```text
 generalization-count-scratchpad/

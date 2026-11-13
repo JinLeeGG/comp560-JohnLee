@@ -1,6 +1,9 @@
 # Step 1: NoPE baseline gate for counting
 
 **Date:** October 6, 2026
+
+**Editorial audit:** November 8, 2026; wording clarified, numerical results retained.
+
 **Purpose:** Check whether a NoPE model can already count `X`s at unseen positions
 without a scratchpad, before building the scratchpad conditions.
 
@@ -24,7 +27,8 @@ but the room is concentrated in count 1.
 - Model: NoPE, causal, 4 layers, 4 heads, embedding 128; no scratchpad.
 - Seeds 1337-1341; 2,000 iterations; checkpoints at 500 / 1,000 / 1,500 / 2,000.
 - Main metric: unseen-position accuracy on counts 1-3 (count 0 has no `X` position,
-  so it is the same in both pools and reported separately).
+  so its class-conditional sampling distribution is unchanged across the separate
+  pools, and it is reported separately).
 
 Command:
 
@@ -41,9 +45,9 @@ Command:
 
 *Figure 1. Unseen-position accuracy at 2,000 iterations. Bars are the mean over five
 seeds; dots are individual seeds. Every seed scored 100% on seen positions (solid
-line). Accuracy drops only for inputs with a single `X`, where three seeds often
-answered 0. Count 0 (no `X`, 100% for every seed) is not shown because it does not
-test an unseen position.*
+line). Accuracy drops mainly for inputs with a single `X`, where three seeds often
+answered 0; count 2 is nearly perfect. Count 0 (no `X`, 100% for every seed) is not
+shown because it does not test an unseen position.*
 
 Final checkpoint (2,000 iterations):
 

@@ -1,0 +1,122 @@
+{
+  "pool_seed": 20261108,
+  "model_seeds": [
+    1337,
+    1338,
+    1339,
+    1340,
+    1341
+  ],
+  "conditions": [
+    "no_scratchpad",
+    "dummy_given",
+    "dummy"
+  ],
+  "probe": "four-class ridge; fit-only standardization; unnormalized SSE + L2(1.0); free intercept",
+  "primary_layer": 4,
+  "query": "non-X character, followed by # when present",
+  "torch_version": "2.8.0",
+  "numpy_version": "2.0.2",
+  "data_sha256": {
+    "train.bin": "4929370e776961faa949b3c8dbd8a1a5ae37d5a63dc8cf080b47d50c3f9860f2",
+    "val.bin": "af8172898cfbb273f85fe4fa78c63d15c10c0e05267cde6dce7d2b0fa51ac78d",
+    "test.bin": "d58c8a6874aba88a5069d49210422cd8c90a0cd20efadec90d2a6364ce8205de",
+    "meta.pkl": "5ebc43f5de17443184ecb5414c4f8bf0035a0b1ae7f14cfb301dcce6c7896c3c"
+  },
+  "checkpoint_sha256": {
+    "out_step5_nope_no_scratchpad_1337/ckpt_iter2000.pt": "35492b0af20189123c5e6dd9e3189b2ccad72d5c08595e83527e59a9f7c66389",
+    "out_step5_nope_no_scratchpad_1338/ckpt_iter2000.pt": "29fb28fdf4c5de77efd735afd5ae6cc4a7bd34316f1323c6ff3d0afbcf315cac",
+    "out_step5_nope_no_scratchpad_1339/ckpt_iter2000.pt": "3e87a8e26050c13d9af501afb05d95bb85c30f6093d56f6003c2c3e4fa46208d",
+    "out_step5_nope_no_scratchpad_1340/ckpt_iter2000.pt": "a6d808f10680535a068f71c1cceb82828f0c8291ccd208b9cf12568e561da9fc",
+    "out_step5_nope_no_scratchpad_1341/ckpt_iter2000.pt": "0b5ca959ac6427dbc6a37cc2250ffb479e93c9cab364eef6cc10b3b100b86f66",
+    "out_step5_nope_dummy_given_1337/ckpt_iter2000.pt": "18dfbb548587fac8c93b7c4f0336fac62eab0afdc924d6245d915498444d1ac5",
+    "out_step5_nope_dummy_given_1338/ckpt_iter2000.pt": "898c675edf55851a746870e8955b526202b9c7cb8b1bf3915bef69e1861d682a",
+    "out_step5_nope_dummy_given_1339/ckpt_iter2000.pt": "51b1453036552b37dd2e81c0abbf53d8b5fc95cffad7d4916963c00ab39a4340",
+    "out_step5_nope_dummy_given_1340/ckpt_iter2000.pt": "ab173aca5c06e5730a4252a7cb6f3383120ce7dabfc78f12f4a9c03bcb670f31",
+    "out_step5_nope_dummy_given_1341/ckpt_iter2000.pt": "2efeb5ed8d5ef1250eacf2246e0192e417ab16f120fae1a272c8763c78470e3d",
+    "out_step5_nope_dummy_1337/ckpt_iter2000.pt": "e56df62ec1f985307bb3301cc91a37c5a4e7b75a888394ac3f5476223c38dbc5",
+    "out_step5_nope_dummy_1338/ckpt_iter2000.pt": "5cf606cd0bff69f7a92a55beca5488149d98110839257cacc34210898a254d71",
+    "out_step5_nope_dummy_1339/ckpt_iter2000.pt": "ad48ff29dd783f2940ed8a60d1185fce54fc4559bf6d85233b2beb4a268c8cb2",
+    "out_step5_nope_dummy_1340/ckpt_iter2000.pt": "574ba8b07e3976ea8342adf4249f5619ba171693be790b677a20404b0be371bc",
+    "out_step5_nope_dummy_1341/ckpt_iter2000.pt": "eb04e480acc677e62e5276716fc19acf421421ce72c9df2ca475773de4bdc31f"
+  },
+  "pools": {
+    "fit": {
+      "n": 1792,
+      "positions": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "labels": {
+        "0": 448,
+        "1": 448,
+        "2": 448,
+        "3": 448
+      },
+      "sha256": "a6bcc6ec1c1d86d22da2be852d9516b84c07749b515c7dcdbd60951ac1ece197"
+    },
+    "seen": {
+      "n": 896,
+      "positions": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "labels": {
+        "0": 224,
+        "1": 224,
+        "2": 224,
+        "3": 224
+      },
+      "sha256": "e6a7c0495f8ab1b90b7dd40cb0e2670e1bf9d5938a0eaca7bae398c384081668"
+    },
+    "unseen": {
+      "n": 3456,
+      "positions": [
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "labels": {
+        "0": 864,
+        "1": 864,
+        "2": 864,
+        "3": 864
+      },
+      "sha256": "c94c1423973296f2d595dddd8da3e033257f3b7153eba5238365f206081d0e57"
+    }
+  }
+}

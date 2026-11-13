@@ -1,6 +1,9 @@
 # Step 3: Scratchpad comparison with NoPE (length 40, train 0-9 / test 10-39)
 
 **Date:** October 12, 2026
+
+**Editorial audit:** November 8, 2026; interpretation clarified, numerical results retained.
+
 **Purpose:** Test whether writing a running count of `X`s (a meaningful scratchpad) lets a
 NoPE model count `X`s at positions it never saw them in, on setting B from Step 2B,
 where the plain model fails. A dummy scratchpad of the same length is the control.
@@ -16,9 +19,12 @@ counted a lone `X` correctly at **every** unseen position, which no dummy or pla
 did.
 
 Two results need care. First, the **dummy scratchpad also helped a lot** (56.2% to
-83.7%), even though its tokens carry no information, so part of the gain at NoPE comes
-from the longer, interleaved format rather than from the count. Why is not known. In
-the distance task the dummy scratchpad did the opposite (it lowered accuracy to 20.7%).
+83.7%), although its constant visible tokens carry no explicit count labels. Thus
+some improvement is possible without explicit running-count targets. This comparison
+changes the format and adds dummy-token prediction loss, so it does not isolate
+which change causes the gain. Its hidden vectors can still carry contextual
+information, as later examined in Step 7. In the distance task the dummy scratchpad
+did the opposite (it lowered accuracy to 20.7%).
 Second, the meaningful scratchpad did not reach 100% as it did in the distance task.
 Most remaining errors have one form: the model **writes the `+1` at an unseen `X`
 correctly, then drops back to the old count** at the next position.
@@ -48,8 +54,8 @@ dummy           #o#l#w#b#p#y#n#b#a#h#f#v#e#y#z#X#y#n#u#j# ... #m#j#y#j#X#a#q#l#u
 meaningful      0o0l0w0b0p0y0n0b0a0h0f0v0e0y0z0X1y1n1u1j1 ... 1m1j1y1j1X2a2q2l2u2r2p2g2:2
 ```
 
-- **Dummy:** a `#` after every input letter. Same length as the meaningful version, no
-  information.
+- **Dummy:** a constant `#` after every input letter. Same length as the meaningful
+  version, with no explicit count labels in its visible tokens.
 - **Meaningful:** after every input letter, the number of `X`s read so far (`+1` at each
   `X`). The last count equals the answer.
 - The leading `0` (or `#`) is always the same, so it is given, not predicted.
@@ -203,9 +209,9 @@ unseen positions and adds 1 almost every time (99.6%).
 **What didn't work:** Two seeds still lost a lone `X` far from the training region, and
 84% of the remaining errors have the same form: the model writes the `+1` and then
 drops back to the old count. The dummy scratchpad also gave a large gain without
-carrying any information, so at NoPE the comparison does not cleanly separate the
-effect of the count from the effect of the longer format. Neither result is explained
-yet.
+explicit count labels, so at NoPE the comparison does not cleanly separate count
+supervision/history from the longer format and dummy-token prediction loss. Neither
+result's full internal mechanism is established by this comparison.
 
 **Next:** Step 4 repeats the same three conditions with RoPE, which also answers the
 meeting note's question of whether RoPE already generalizes without a scratchpad.

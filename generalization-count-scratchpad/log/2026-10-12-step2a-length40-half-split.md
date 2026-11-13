@@ -1,6 +1,9 @@
 # Step 2A: Longer input, half split (length 40, train 0-19 / test 20-39)
 
 **Date:** October 12, 2026
+
+**Editorial audit:** November 8, 2026; selection-rule wording clarified, numerical results retained.
+
 **Purpose:** Find a setting where the plain model (NoPE, no scratchpad) clearly fails at
 unseen positions, so the scratchpad comparison has room to show an effect. This is the
 first variant from the October 2 meeting note: a longer input with a half split.
@@ -18,9 +21,10 @@ started missing a lone `X` at its own position between 30 and 39. Inputs with tw
 three `X`s were always correct. This setting is too easy, so I moved on to the note's
 second split (Step 2B).
 
-"Too easy" was fixed before running: the plain model must be 100% on seen positions for
-every seed, at most about 70% on unseen positions (mean, counts 1-3), and perfect in at
-most one seed.
+The gate for selecting a sufficiently hard setting was fixed before running: the
+plain model must be 100% on seen positions for every seed, at most about 70% on
+unseen positions (mean, counts 1-3), and perfect in at most one seed. Setting A did
+not meet this gate because its unseen mean was too high.
 
 ## Experimental setup
 
@@ -119,7 +123,8 @@ perfect everywhere.
 depending on the seed) was missed and answered 0.
 
 **Decision:** Setting A is easier than length 20 (94.7% vs 89.9%), far above the
-pre-set bar of about 70%, so it cannot show a scratchpad effect. One possible reason is
+pre-set bar of about 70%, leaving relatively little headroom for a scratchpad effect;
+it was not selected under the planned gate. One possible reason is
 that the training region doubled from 10 to 20 positions while the split ratio stayed
 50:50; this was not tested. Next: the note's second split, training on positions 0-9
 only and testing on 10-39 (Step 2B).

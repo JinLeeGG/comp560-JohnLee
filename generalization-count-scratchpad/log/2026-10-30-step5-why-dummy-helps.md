@@ -1,8 +1,12 @@
 # Step 5: Why the dummy scratchpad helps, with NoPE (length 40, train 0-9 / test 10-39)
 
 **Date:** October 29-30, 2026
+
+**Editorial audit:** November 8, 2026; interpretation clarified, numerical results retained.
+
 **Purpose:** In Step 3 the dummy scratchpad (`#` after every input letter) raised NoPE's
-unseen-position accuracy from 56.2% to 83.7%, although its tokens carry no information.
+unseen-position accuracy from 56.2% to 83.7%, although its constant visible tokens
+carry no explicit count labels. Their hidden vectors can still depend on context.
 This step tests the three ideas from the October 16 meeting for why: random symbols
 instead of `#`, fewer `#`, and moving all the `#` to one side of the input. The
 hypothesis was that the extra tokens give the model more room to compute.
@@ -16,7 +20,8 @@ hypothesis was that the extra tokens give the model more room to compute.
   or 3 `X`s. **k=1, k=2, k=3**: inputs with exactly that many `X`s. Inputs with no `X`
   have no `X` position, so they are reported separately (100% everywhere).
 - **Above / below:** higher or lower in at least 4 of 5 seeds, paired by seed;
-  otherwise **about equal**. Fixed before running.
+  otherwise **about equal**. Fixed before running. These are descriptive labels,
+  not statistical-significance tests or evidence of statistical equivalence.
 
 ## Activity summary
 
@@ -338,3 +343,8 @@ drop comes from the `:`.
 2. Why pad at start loses one of three `X`s, almost always when the last `X` is late.
 3. Why fewer `#` (every 4) beats more (every 2 and the dummy).
 4. Why training on the `#` helps the dummy layout but not pad at end.
+
+**Subsequent work (November 8):** [Step 6](2026-11-08-step6-single-token-results.md)
+tested a single supplied prefix and suffix, narrowing the placement interpretation.
+[Step 7](2026-11-08-step7-hidden-count-probes.md) examined count information inside
+the original dummy's hidden vectors, with random-model and shuffled-label controls.

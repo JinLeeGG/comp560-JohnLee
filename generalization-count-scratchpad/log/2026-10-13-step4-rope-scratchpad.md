@@ -1,21 +1,25 @@
 # Step 4: Scratchpad comparison with RoPE (length 40, train 0-9 / test 10-39)
 
 **Date:** October 12-13, 2026
+
+**Editorial audit:** November 8, 2026; interpretation and rounding clarified, underlying results retained.
+
 **Purpose:** Repeat Step 3 with RoPE instead of NoPE, on the same data, seeds, and
 conditions. This also answers the meeting note's question: does RoPE already count
 `X`s at unseen positions without a scratchpad?
 
 ## Activity summary
 
-**RoPE does not generalize without a scratchpad.** It scored **12.4%** on unseen
-positions (counts 1-3), far below NoPE's 56.2% and below the 25% of random guessing,
-because it consistently under-counts. Unlike NoPE, it also fails on three `X`s.
+**RoPE generalizes poorly without a scratchpad.** It scored **12.35%** on unseen
+positions (counts 1-3), far below NoPE's 56.2% and below 25% for uniform guessing
+among the four count labels. It consistently under-counts. Unlike NoPE, it also
+fails on three `X`s.
 
-The **dummy scratchpad did nothing** for RoPE (11.7%), unlike at NoPE where it raised
-accuracy to 83.7%. The **meaningful scratchpad raised accuracy to 47.9%** and beat both
-other conditions in every seed. Because the dummy gives no gain here, the improvement
-comes from writing the count itself, which separates the two effects more cleanly than
-at NoPE.
+The **dummy scratchpad did not improve the mean** for RoPE (11.72%), unlike at NoPE
+where it raised accuracy to 83.7%. The **meaningful scratchpad raised accuracy to
+47.85%** and beat both other conditions in every seed. This supports a benefit from
+explicit running-count supervision and generated count history relative to the
+matched-length dummy control; it does not identify a unique internal mechanism.
 
 Still, the meaningful scratchpad is far from the 100% it reached in the distance task
 with RoPE. Its failures are mostly **the opposite of NoPE's**: where NoPE adds 1 and
@@ -209,12 +213,13 @@ Comparison with the distance task (same model and seeds, RoPE, 2,000 iterations)
 
 ## Conclusion
 
-**What worked:** The meaningful scratchpad improved RoPE in every seed (12.4% to
-47.9%), and since the dummy scratchpad gave no gain, this improvement comes from
-writing the count. One seed counted a lone `X` at every unseen position.
+**What worked:** The meaningful scratchpad improved RoPE in every seed (12.35% to
+47.85%) and outperformed the matched-length dummy control. Explicit running-count
+supervision and history help in this comparison. One seed counted a lone `X` at
+every unseen position.
 
 **What didn't work:** RoPE without a scratchpad does not generalize to unseen positions
-(12.4%), which answers the meeting note's question. With the meaningful scratchpad it
+(12.35%), which answers the meeting note's question. With the meaningful scratchpad it
 still often fails to add 1 at an unseen `X`, and which step fails changes from seed to
 seed. Counting is much harder than the distance task for RoPE, where the meaningful
 scratchpad reached 100%.

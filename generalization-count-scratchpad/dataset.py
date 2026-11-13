@@ -39,7 +39,7 @@ def load_raw_examples(data_dir: str, name: str, meta: Dict) -> List[Tuple[str, s
 
 
 def example_fillers(examples, condition: str, meta: Dict, name: str):
-    """Filler tokens per example (None outside Step 5).
+    """Filler tokens per example (None outside the filler conditions).
 
     Random symbols are drawn in file order from an RNG seeded by the data seed and the
     split name, so every run and every evaluation sees the same symbols.

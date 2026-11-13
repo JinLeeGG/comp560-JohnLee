@@ -1,6 +1,9 @@
 # Step 2B: Longer input, small training region (length 40, train 0-9 / test 10-39)
 
 **Date:** October 12, 2026
+
+**Editorial audit:** November 8, 2026; training-budget claims clarified, numerical results retained.
+
 **Purpose:** Second variant from the October 2 meeting note ("seen only 10; last 30
 unseen"). Setting A (Step 2A) was too easy, so this keeps length 40 but shows `X`s in
 only the first 10 positions during training. The goal is still a setting where the
@@ -129,16 +132,17 @@ Mean unseen accuracy (counts 1-3) across checkpoints:
 |---:|---:|---:|---:|
 | 55.11% | 55.31% | 55.60% | 56.19% |
 
-Accuracy barely moves with more training, so the failure is not from too few
-iterations. Step 3 retrained this exact condition with `block_size = 96` and got
-identical numbers for every seed.
+Accuracy barely changes between the measured 500-2,000-iteration checkpoints;
+extending training within this budget does not resolve the failure. Longer budgets
+were not tested. Step 3 retrained this exact condition with `block_size = 96` and
+got identical numbers for every seed.
 
 ## Conclusion
 
 **What worked:** Every seed learned the task (100% on seen positions), and the results
 are consistent across seeds: all five lose a lone `X` within a few positions of 16, and
-none recovers with more training. This is the clear, stable failure the scratchpad
-comparison needs.
+none recovers within the measured training budget. This is the clear, stable failure
+the scratchpad comparison needs.
 
 **What didn't work:** The plain model does not count a lone `X` beyond about position
 15 at all, and two-`X` inputs fail when both `X`s are far from the training region.

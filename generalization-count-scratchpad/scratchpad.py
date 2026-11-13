@@ -30,21 +30,30 @@ pad_end_given is pad_end under that rule (a stopped first batch):
     dummy_given    #m#p#X#a#X#...#:2      same record as dummy
     random_filler  !m%p+X&a?X...<:2       dummy layout, a random symbol in every slot
     pad_end_given  mpXaX...###...###:2    same record as pad_end
+
+Step 6 supplies a single '#' at one end of the body. Both versions have answer-only
+loss, the same answer position, and a fixed-length raw body:
+
+    prefix_one     #mpXaX...:2
+    suffix_one     mpXaX...#:2
 """
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
 
 WRITTEN_FILLER_CONDITIONS = ('pad_end', 'pad_start', 'every2', 'every4')
-GIVEN_FILLER_CONDITIONS = ('dummy_given', 'random_filler', 'pad_end_given')
+GIVEN_FILLER_CONDITIONS = (
+    'dummy_given', 'random_filler', 'pad_end_given', 'prefix_one', 'suffix_one',
+)
 FILLER_CONDITIONS = WRITTEN_FILLER_CONDITIONS + GIVEN_FILLER_CONDITIONS
 CONDITIONS = ('no_scratchpad', 'dummy', 'meaningful') + FILLER_CONDITIONS
 DUMMY_STATE = '#'
 INITIAL_STATES = {'dummy': DUMMY_STATE, 'meaningful': '0'}
-# Where a Step 5 version puts its filler slots: an interleave stride, or one block.
+# Filler placement: an interleave stride, a full block, or one token at an end.
 FILLER_LAYOUTS = {
     'pad_end': 'end', 'pad_start': 'start', 'every2': 2, 'every4': 4,
     'dummy_given': 1, 'random_filler': 1, 'pad_end_given': 'end',
+    'prefix_one': 'single_start', 'suffix_one': 'single_end',
 }
 IGNORE_INDEX = -1
 
@@ -119,10 +128,12 @@ def allowed_state_tokens(condition: str, count_tokens: List[str]) -> List[str]:
 
 
 def filler_count(condition: str, length: int) -> int:
-    """Number of filler tokens a Step 5 version adds to a body of this length."""
+    """Number of filler tokens a version adds to a body of this length."""
     if condition not in FILLER_CONDITIONS:
         raise ValueError(f"the {condition} condition has no filler tokens")
     layout = FILLER_LAYOUTS[condition]
+    if layout in ('single_start', 'single_end'):
+        return 1
     if layout in ('end', 'start'):
         # As many as the dummy has, so only their place changes.
         return length + 1
@@ -153,10 +164,10 @@ def filler_layout(
     if len(fillers) != filler_count(condition, len(body)):
         raise ValueError(f"{condition} needs {filler_count(condition, len(body))} fillers")
     layout = FILLER_LAYOUTS[condition]
-    if layout == 'end':
+    if layout in ('end', 'single_end'):
         tokens = list(body) + list(fillers)
         is_filler = [False] * len(body) + [True] * len(fillers)
-    elif layout == 'start':
+    elif layout in ('start', 'single_start'):
         tokens = list(fillers) + list(body)
         is_filler = [True] * len(fillers) + [False] * len(body)
     else:
@@ -184,7 +195,7 @@ def build_supervised_example(
     """Build one next-token input with disjoint state and answer loss masks.
 
     For a target at full record index j, the corresponding model logit is at input
-    index j-1.  The no-scratchpad condition and the given Step 5 versions have an
+    index j-1. The no-scratchpad condition and the given filler versions have an
     answer target only.
     """
     expected_label = count_label(body)
@@ -192,7 +203,7 @@ def build_supervised_example(
         raise ValueError(f"wrong label {label!r} for {body!r}; expected {expected_label!r}")
     check_condition(condition)
     if (fillers is not None) != (condition in FILLER_CONDITIONS):
-        raise ValueError(f"fillers are passed for the Step 5 versions only, not {condition}")
+        raise ValueError(f"fillers must be passed exactly for filler conditions: {condition}")
 
     tokens: List[str] = []
     roles: List[str] = []
